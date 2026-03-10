@@ -3,6 +3,10 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var inventorySnapshot: PrinterInventorySnapshot?
+    @State private var bridgeConfiguration = BridgeConfiguration()
+    @State private var bridgeStatus: BridgeStatusSnapshot?
+    @State private var advertisedNameDraft = ""
+    @State private var bridgeMessage: String?
 
     var body: some View {
         ScrollView {
@@ -42,6 +46,9 @@ struct ContentView: View {
                 GroupBox("Queue Inventory") {
                     inventorySection
                 }
+                GroupBox("Bridge Control") {
+                    bridgeControlSection
+                }
                 GroupBox("Next Steps") {
                     VStack(alignment: .leading, spacing: 8) {
                         ForEach(ProjectRoadmap.nearTerm, id: \.self) { item in
@@ -55,7 +62,7 @@ struct ContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .task {
-            inventorySnapshot = PrinterInventoryService().snapshot(preferredQueueName: ProjectMetadata.primaryTargetPrinter)
+            loadBridgeState()
         }
     }
 
@@ -117,6 +124,136 @@ struct ContentView: View {
         } else {
             ProgressView("Inspecting local printers…")
                 .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    @ViewBuilder
+    private var bridgeControlSection: some View {
+        if let inventorySnapshot {
+            VStack(alignment: .leading, spacing: 12) {
+                Picker("Selected Printer", selection: selectedQueueBinding) {
+                    ForEach(inventorySnapshot.queues) { queue in
+                        Text(queue.name).tag(Optional(queue.name))
+                    }
+                }
+                .pickerStyle(.menu)
+
+                TextField("Advertised AirPrint Name", text: $advertisedNameDraft, prompt: Text("Use printer description by default"))
+
+                HStack(spacing: 12) {
+                    Button(bridgeConfiguration.isEnabled ? "Disable AirPrint" : "Enable AirPrint") {
+                        toggleBridgeEnabled()
+                    }
+
+                    Button("Apply Name") {
+                        applyAdvertisedName()
+                    }
+                    .disabled(inventorySnapshot.queues.isEmpty)
+
+                    Button("Reload") {
+                        loadBridgeState()
+                    }
+                }
+
+                if let bridgeStatus {
+                    Divider()
+                    Text("State: \(bridgeStatus.activationState.rawValue)")
+                        .font(.headline)
+                    Text(bridgeStatus.message)
+                        .foregroundStyle(.secondary)
+
+                    if let advertisement = bridgeStatus.advertisement {
+                        Text("Service: \(advertisement.serviceName)")
+                        Text(advertisement.printerURI)
+                            .font(.system(.footnote, design: .monospaced))
+
+                        if !advertisement.warnings.isEmpty {
+                            Divider()
+                            ForEach(advertisement.warnings, id: \.self) { warning in
+                                Text(warning)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+
+                if let bridgeMessage, !bridgeMessage.isEmpty {
+                    Divider()
+                    Text(bridgeMessage)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            ProgressView("Loading bridge configuration…")
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var selectedQueueBinding: Binding<String?> {
+        Binding(
+            get: { bridgeConfiguration.selectedQueueName },
+            set: { newValue in
+                bridgeConfiguration.selectedQueueName = newValue
+                persistConfiguration(message: "Selected printer updated.")
+            }
+        )
+    }
+
+    private func loadBridgeState() {
+        let store = BridgeConfigurationStore()
+        let inventoryService = PrinterInventoryService()
+        let statusService = BridgeStatusService(inventoryService: inventoryService)
+
+        do {
+            var configuration = try store.load()
+            let snapshot = inventoryService.snapshot(preferredQueueName: configuration.selectedQueueName)
+
+            if configuration.selectedQueueName == nil {
+                configuration.selectedQueueName = snapshot.queues.first?.name
+            }
+
+            bridgeConfiguration = configuration
+            advertisedNameDraft = configuration.advertisedNameOverride ?? ""
+            inventorySnapshot = snapshot
+            bridgeStatus = statusService.evaluate(configuration: configuration)
+            bridgeMessage = nil
+        } catch {
+            bridgeMessage = "Failed to load bridge state: \(error.localizedDescription)"
+            inventorySnapshot = inventoryService.snapshot(preferredQueueName: ProjectMetadata.primaryTargetPrinter)
+            bridgeStatus = nil
+        }
+    }
+
+    private func toggleBridgeEnabled() {
+        bridgeConfiguration.isEnabled.toggle()
+        persistConfiguration(
+            message: bridgeConfiguration.isEnabled
+                ? "Bridge enabled for \(bridgeConfiguration.selectedQueueName ?? "the selected queue")."
+                : "Bridge disabled."
+        )
+    }
+
+    private func applyAdvertisedName() {
+        bridgeConfiguration.advertisedNameOverride = advertisedNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? nil
+            : advertisedNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        persistConfiguration(message: "Advertised name updated.")
+    }
+
+    private func persistConfiguration(message: String) {
+        let store = BridgeConfigurationStore()
+        let inventoryService = PrinterInventoryService()
+        let statusService = BridgeStatusService(inventoryService: inventoryService)
+
+        do {
+            try store.save(bridgeConfiguration)
+            inventorySnapshot = inventoryService.snapshot(preferredQueueName: bridgeConfiguration.selectedQueueName)
+            bridgeStatus = statusService.evaluate(configuration: bridgeConfiguration)
+            bridgeMessage = message
+        } catch {
+            bridgeMessage = "Failed to save bridge configuration: \(error.localizedDescription)"
         }
     }
 }

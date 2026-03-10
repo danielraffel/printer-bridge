@@ -1,7 +1,7 @@
 import Testing
 @testable import PrinterBridgeCore
 
-private struct InventoryStubCommandRunner: CommandRunning {
+struct InventoryStubCommandRunner: CommandRunning {
     let handler: (String, [String]) -> CommandResult
 
     func run(executable: String, arguments: [String]) -> CommandResult {

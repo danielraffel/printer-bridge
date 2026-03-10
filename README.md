@@ -109,6 +109,17 @@ Inspect the current CUPS-backed queue inventory:
 ```sh
 ./scripts/validate/run-local-cli.sh list-printers
 ./scripts/validate/run-local-cli.sh inspect-printer Brother_HL_2170W_series
+./scripts/validate/run-local-cli.sh ipp-attributes Brother_HL_2170W_series
+```
+
+Toggle the planned bridge state without launching the GUI:
+
+```sh
+CONFIG_PATH="$(mktemp -u /tmp/printerbridge-config.XXXXXX.json)"
+PRINTERBRIDGE_CONFIG_PATH="$CONFIG_PATH" ./.build/bin/PrinterBridgeCLI show-config
+PRINTERBRIDGE_CONFIG_PATH="$CONFIG_PATH" ./.build/bin/PrinterBridgeCLI enable Brother_HL_2170W_series
+PRINTERBRIDGE_CONFIG_PATH="$CONFIG_PATH" ./.build/bin/PrinterBridgeCLI bridge-status
+PRINTERBRIDGE_CONFIG_PATH="$CONFIG_PATH" ./.build/bin/PrinterBridgeCLI disable
 ```
 
 Run the same diagnostics remotely after deploying the CLI:
