@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+
+# Xcode / Swift
+DerivedData/
+.build/
+build/
+apps/macos/PrinterBridge.xcodeproj/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcuserdatad/
+*.xcuserstate
+Package.resolved
+
+# SwiftPM
+.swiftpm/
+
+# Logs and local outputs
+*.log
+*.tmp
+*.swp
+
+# Coverage and test artifacts
+coverage/
+test-results/
+artifacts/
+
+# Local environment
+.env
+.env.*
+
+# Editor
+.vscode/
+.idea/
