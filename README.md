@@ -104,6 +104,13 @@ Run local diagnostics without launching the GUI:
 ./scripts/validate/run-local-cli.sh doctor Brother_HL_2170W_series
 ```
 
+Inspect the current CUPS-backed queue inventory:
+
+```sh
+./scripts/validate/run-local-cli.sh list-printers
+./scripts/validate/run-local-cli.sh inspect-printer Brother_HL_2170W_series
+```
+
 Run the same diagnostics remotely after deploying the CLI:
 
 ```sh

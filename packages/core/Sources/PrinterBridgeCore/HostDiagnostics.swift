@@ -1,90 +1,5 @@
 import Foundation
 
-public struct CommandResult: Equatable {
-    public let executable: String
-    public let arguments: [String]
-    public let exitCode: Int32
-    public let standardOutput: String
-    public let standardError: String
-
-    public init(
-        executable: String,
-        arguments: [String],
-        exitCode: Int32,
-        standardOutput: String,
-        standardError: String
-    ) {
-        self.executable = executable
-        self.arguments = arguments
-        self.exitCode = exitCode
-        self.standardOutput = standardOutput
-        self.standardError = standardError
-    }
-
-    public var combinedOutput: String {
-        let stdout = standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)
-        let stderr = standardError.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        switch (stdout.isEmpty, stderr.isEmpty) {
-        case (false, true):
-            return stdout
-        case (true, false):
-            return stderr
-        case (false, false):
-            return "\(stdout)\n\(stderr)"
-        case (true, true):
-            return ""
-        }
-    }
-
-    public var commandDescription: String {
-        ([executable] + arguments).joined(separator: " ")
-    }
-}
-
-public protocol CommandRunning {
-    func run(executable: String, arguments: [String]) -> CommandResult
-}
-
-public struct ProcessCommandRunner: CommandRunning {
-    public init() {}
-
-    public func run(executable: String, arguments: [String]) -> CommandResult {
-        let process = Process()
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            return CommandResult(
-                executable: executable,
-                arguments: arguments,
-                exitCode: 127,
-                standardOutput: "",
-                standardError: error.localizedDescription
-            )
-        }
-
-        let stdout = String(data: stdoutPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-        let stderr = String(data: stderrPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
-
-        return CommandResult(
-            executable: executable,
-            arguments: arguments,
-            exitCode: process.terminationStatus,
-            standardOutput: stdout,
-            standardError: stderr
-        )
-    }
-}
-
 public enum DiagnosticStatus: String {
     case ok = "ok"
     case warning = "warning"
@@ -148,41 +63,6 @@ public struct DiagnosticReport: Equatable {
 }
 
 public struct HostDiagnosticsService {
-    public enum HostCommand: CaseIterable {
-        case swVers
-        case uname
-        case lpstat
-        case lpoptions
-        case ippfind
-        case dnsSD
-
-        public var path: String {
-            switch self {
-            case .swVers:
-                return "/usr/bin/sw_vers"
-            case .uname:
-                return "/usr/bin/uname"
-            case .lpstat:
-                return "/usr/bin/lpstat"
-            case .lpoptions:
-                return "/usr/bin/lpoptions"
-            case .ippfind:
-                return "/usr/bin/ippfind"
-            case .dnsSD:
-                return "/usr/bin/dns-sd"
-            }
-        }
-
-        public var isRequired: Bool {
-            switch self {
-            case .swVers, .uname, .lpstat, .lpoptions, .ippfind:
-                return true
-            case .dnsSD:
-                return false
-            }
-        }
-    }
-
     private let runner: any CommandRunning
     private let fileManager: FileManager
 
@@ -193,7 +73,7 @@ public struct HostDiagnosticsService {
 
     public func doctor(printerName: String? = ProjectMetadata.primaryTargetPrinter) -> DiagnosticReport {
         let targetPrinter = printerName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let defaultPrinter = runRequired("Default Printer", executable: HostCommand.lpstat.path, arguments: ["-d"])
+        let defaultPrinter = runRequired("Default Printer", executable: SystemTool.lpstat.path, arguments: ["-d"])
         let printerList = listPrintersSection()
         let services = listServicesSection()
 
@@ -276,8 +156,8 @@ public struct HostDiagnosticsService {
     }
 
     private func hostSection() -> DiagnosticSection {
-        let version = runRequired("macOS Version", executable: HostCommand.swVers.path, arguments: [])
-        let arch = runRequired("Architecture", executable: HostCommand.uname.path, arguments: ["-m"])
+        let version = runRequired("macOS Version", executable: SystemTool.swVers.path, arguments: [])
+        let arch = runRequired("Architecture", executable: SystemTool.uname.path, arguments: ["-m"])
 
         let output = """
         \(version.output.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -290,14 +170,14 @@ public struct HostDiagnosticsService {
     }
 
     private func commandAvailabilitySection() -> DiagnosticSection {
-        let lines = HostCommand.allCases.map { command in
+        let lines = SystemTool.allCases.map { command in
             let available = fileManager.isExecutableFile(atPath: command.path)
             let marker = available ? "available" : "missing"
             let requirement = command.isRequired ? "required" : "optional"
             return "\(URL(fileURLWithPath: command.path).lastPathComponent): \(marker) (\(requirement))"
         }
 
-        let missingRequired = HostCommand.allCases.contains { command in
+        let missingRequired = SystemTool.allCases.contains { command in
             command.isRequired && !fileManager.isExecutableFile(atPath: command.path)
         }
 
@@ -310,8 +190,8 @@ public struct HostDiagnosticsService {
     }
 
     private func listPrintersSection() -> DiagnosticSection {
-        let printerState = runRequired("Configured Printers", executable: HostCommand.lpstat.path, arguments: ["-p"])
-        let printerURIs = runRequired("Printer URIs", executable: HostCommand.lpstat.path, arguments: ["-v"])
+        let printerState = runRequired("Configured Printers", executable: SystemTool.lpstat.path, arguments: ["-p"])
+        let printerURIs = runRequired("Printer URIs", executable: SystemTool.lpstat.path, arguments: ["-v"])
 
         let output = """
         \(printerState.output.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -326,12 +206,12 @@ public struct HostDiagnosticsService {
     private func inspectPrinterSection(named printerName: String) -> DiagnosticSection {
         let details = runOptional(
             "Printer Detail",
-            executable: HostCommand.lpstat.path,
+            executable: SystemTool.lpstat.path,
             arguments: ["-l", "-p", printerName]
         )
         let options = runOptional(
             "Printer Options",
-            executable: HostCommand.lpoptions.path,
+            executable: SystemTool.lpoptions.path,
             arguments: ["-p", printerName, "-l"]
         )
 
@@ -359,12 +239,12 @@ public struct HostDiagnosticsService {
     private func listServicesSection() -> (universal: DiagnosticSection, general: DiagnosticSection) {
         let universal = runOptional(
             "AirPrint-Style Services",
-            executable: HostCommand.ippfind.path,
+            executable: SystemTool.ippfind.path,
             arguments: ["-T", "2", "_ipp._tcp,_universal", "--print"]
         )
         let general = runOptional(
             "IPP Services",
-            executable: HostCommand.ippfind.path,
+            executable: SystemTool.ippfind.path,
             arguments: ["-T", "2", "_ipp._tcp", "--print"]
         )
 
