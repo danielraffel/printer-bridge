@@ -5,7 +5,7 @@ Printer Bridge is a macOS-first AirPrint bridge for legacy printers that already
 Download the latest signed universal macOS installer:
 - supports Intel and Apple Silicon Macs
 - requires macOS 15 or later
-- [Printer-Bridge.pkg](https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg)
+- [Printer-Bridge.dmg](https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.dmg)
 - [All Releases](https://github.com/danielraffel/printer-bridge/releases)
 
 The initial target is a Brother HL-2170W environment verified through:
