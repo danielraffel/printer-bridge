@@ -98,8 +98,16 @@
         }
 
         .hero-card {
-            padding: 48px 42px 40px;
+            padding: 28px 42px 40px;
             text-align: center;
+        }
+
+        .hero-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 28px;
         }
 
         .hero-icon-link {
@@ -120,7 +128,7 @@
             gap: 8px;
             padding: 6px 12px;
             border-radius: 999px;
-            margin-bottom: 18px;
+            margin-bottom: 0;
             font-size: 0.78rem;
             font-weight: 700;
             letter-spacing: 0.08em;
@@ -128,6 +136,25 @@
             color: var(--accent);
             background: var(--panel-muted);
             border: 1px solid var(--border);
+        }
+
+        .hero-source {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: var(--panel-strong);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-weight: 700;
+            transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+        }
+
+        .hero-source:hover {
+            color: var(--text);
+            transform: translateY(-1px);
+            border-color: rgba(100, 118, 145, 0.24);
         }
 
         h1 {
@@ -185,25 +212,15 @@
         }
 
         .button-primary:hover {
+            color: #fff;
             transform: translateY(-1px);
             box-shadow: 0 24px 56px rgba(29, 109, 242, 0.26);
         }
 
         .button-primary:active {
+            color: #fff;
             transform: translateY(0);
             box-shadow: inset 0 1px 4px rgba(10, 18, 33, 0.26);
-        }
-
-        .button-secondary {
-            min-width: auto;
-            padding-inline: 18px;
-            color: var(--text);
-            background: var(--panel-strong);
-            border: 1px solid var(--border);
-        }
-
-        .button-secondary:hover {
-            transform: translateY(-1px);
         }
 
         .button-note {
@@ -362,7 +379,11 @@
             }
 
             .hero-card {
-                padding: 36px 22px 28px;
+                padding: 22px 22px 28px;
+            }
+
+            .hero-topbar {
+                margin-bottom: 22px;
             }
 
             .section-card {
@@ -374,18 +395,20 @@
 <body>
     <div class="container">
         <section class="hero-card">
+            <div class="hero-topbar">
+                <div class="eyebrow">macOS App</div>
+                <a class="hero-source" href="https://github.com/danielraffel/printer-bridge">Source on GitHub</a>
+            </div>
             <a class="hero-icon-link" href="./assets/printer-bridge-icon.png">
                 <img class="hero-icon" src="./assets/printer-bridge-icon.png" alt="Printer Bridge app icon">
             </a>
-            <div class="eyebrow">macOS App</div>
             <h1>Printer Bridge</h1>
             <p class="lede">Printer Bridge helps keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.</p>
             <div class="hero-actions">
                 <div class="button-row">
-                    <a class="button button-primary" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.dmg">Download for macOS</a>
-                    <a class="button button-secondary" href="https://github.com/danielraffel/printer-bridge">View Source</a>
+                    <a class="button button-primary" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.dmg">Download for Free on macOS</a>
                 </div>
-                <div class="button-note">Includes installer and uninstaller. For Apple Silicon and Intel Macs on macOS 15 or later.</div>
+                <div class="button-note">For Apple Silicon and Intel Macs.</div>
             </div>
         </section>
 
@@ -399,8 +422,8 @@
                 </div>
                 <div class="gallery">
                     <figure class="gallery-card">
-                        <img src="./assets/gallery/printers-light.png" alt="Printer Bridge printers view in light mode">
-                        <figcaption class="gallery-caption">A focused printer view with quick AirPrint controls.</figcaption>
+                        <img src="./assets/gallery/printers-dark.png" alt="Printer Bridge printers view in dark mode">
+                        <figcaption class="gallery-caption">A focused printer view with quick AirPrint controls and live AirPrint status.</figcaption>
                     </figure>
                     <figure class="gallery-card">
                         <img src="./assets/gallery/printers-dark-jobs.png" alt="Printer Bridge jobs view in dark mode">
@@ -418,22 +441,34 @@
             <div class="section-card">
                 <div class="section-header">
                     <div>
-                        <h2 class="section-title">Why use Printer Bridge</h2>
-                        <p class="section-copy">If your Mac can already print to a printer but that printer does not support AirPrint, Printer Bridge will usually make it available to iPhone, iPad, and other Apple devices on your local network.</p>
+                        <h2 class="section-title">Features</h2>
+                        <p class="section-copy">Printer Bridge is a universal macOS app for Intel and Apple Silicon Macs that turns existing macOS printer support into usable AirPrint sharing for modern Apple devices.</p>
                     </div>
                 </div>
                 <div class="features">
                     <div class="feature">
-                        <h3>Built on what already works</h3>
-                        <p>Printer Bridge uses the printer queue macOS already knows how to print to, instead of requiring a new driver stack.</p>
+                        <h3>AirPrint for existing printers</h3>
+                        <p>If your Mac can already print to the printer, Printer Bridge will usually make it available to iPhone, iPad, and other Apple devices.</p>
                     </div>
                     <div class="feature">
-                        <h3>Runs locally on your Mac</h3>
-                        <p>A small background service advertises the printer over AirPrint and forwards jobs into the existing macOS and CUPS queue.</p>
+                        <h3>Multiple printers and queue view</h3>
+                        <p>Enable one or more printers and check recent print jobs from the same app.</p>
                     </div>
                     <div class="feature">
-                        <h3>Private by default</h3>
-                        <p>No analytics, no tracking, no ad network, and no data resale. Printer Bridge is designed to stay local to your network.</p>
+                        <h3>Rename and control sharing</h3>
+                        <p>Rename a printer if you want a cleaner AirPrint name, and enable or disable sharing whenever you need.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>System, light, or dark appearance</h3>
+                        <p>Choose the app appearance you want, or leave it on System to follow macOS automatically.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>No legacy printer sharing required</h3>
+                        <p>Current builds usually use Printer Bridge’s own local proxy service instead of depending on the older macOS Printer Sharing path.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>Private and local</h3>
+                        <p>No analytics, no tracking, no ad network, and no data resale. Printing stays on your Mac and local network.</p>
                     </div>
                 </div>
             </div>
@@ -455,6 +490,12 @@
                         </div>
                     </details>
                     <details>
+                        <summary>What Macs does this support?</summary>
+                        <div class="faq-body">
+                            <p>Printer Bridge supports Apple Silicon and Intel Macs. It has been tested on macOS 15 and later, including macOS 26.</p>
+                        </div>
+                    </details>
+                    <details>
                         <summary>Do I need to leave my Mac on?</summary>
                         <div class="faq-body">
                             <p>Yes. Your Mac is the bridge, so it needs to stay awake and connected to your local network for AirPrint discovery and printing to keep working.</p>
@@ -467,9 +508,21 @@
                         </div>
                     </details>
                     <details>
-                        <summary>How can I contribute?</summary>
+                        <summary>Where do I file bugs?</summary>
                         <div class="faq-body">
-                            <p><a href="https://github.com/danielraffel/printer-bridge">The project is open source on GitHub</a>. You can file issues, open pull requests, or use it as a base for keeping more working hardware out of unnecessary e-waste.</p>
+                            <p>Bug reports belong on GitHub using the <a href="https://github.com/danielraffel/printer-bridge/issues/new?template=bug_report.yml">bug report template</a>.</p>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Where do I file feature requests?</summary>
+                        <div class="faq-body">
+                            <p>Feature ideas belong on GitHub using the <a href="https://github.com/danielraffel/printer-bridge/issues/new?template=feature_request.yml">feature request template</a>.</p>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Why is this free?</summary>
+                        <div class="faq-body">
+                            <p>We believe hardware deserves to be liberated when vendors no longer support it or keep it up to date. We understand why they stop investing in older devices, but ideally they would open-source that work. When they do not, we are motivated to help fill the gap with modern capabilities so more devices stay out of the e-waste stream.</p>
                         </div>
                     </details>
                 </div>
@@ -477,7 +530,7 @@
         </section>
 
         <footer class="footer">
-            <div>Created by Generous Corp. and Daniel Raffel.</div>
+            <div>Created by <a class="text-link" href="https://www.generouscorp.com/projects.html">Generous Corp.</a> and <a class="text-link" href="https://danielraffel.me/about/">Daniel Raffel</a>.</div>
             <div class="footer-links">
                 <a class="text-link" href="./legal/privacy.html">Privacy Policy</a>
                 <a class="text-link" href="./legal/terms.html">Terms</a>
