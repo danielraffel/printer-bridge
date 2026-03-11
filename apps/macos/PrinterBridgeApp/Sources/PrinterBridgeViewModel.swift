@@ -458,8 +458,6 @@ final class PrinterBridgeViewModel: ObservableObject {
             publicationState = .waiting("The background service is not running.")
         case .requiresApproval:
             publicationState = .waiting("Allow Printer Bridge in System Settings > General > Login Items to keep sharing in the background.")
-        case .notFound:
-            publicationState = .failed("The bundled background service is missing from the app.")
         case let .failed(reason):
             publicationState = .failed(reason)
         }

@@ -8,7 +8,6 @@ enum BackgroundAgentState: Equatable {
     case running
     case loaded
     case requiresApproval
-    case notFound
     case failed(String)
 }
 
@@ -46,9 +45,7 @@ struct BackgroundAgentController {
             return launchdEnabledState()
         case .requiresApproval:
             return .requiresApproval
-        case .notFound:
-            return .notFound
-        case .notRegistered:
+        case .notFound, .notRegistered:
             do {
                 try service.register()
             } catch {
@@ -56,7 +53,7 @@ struct BackgroundAgentController {
                 switch currentState {
                 case .running, .loaded, .requiresApproval:
                     return currentState
-                case .stopped, .notFound, .failed:
+                case .stopped, .failed:
                     throw BackgroundAgentError.commandFailed("SMAppService.register()", error.localizedDescription)
                 }
             }
@@ -151,14 +148,12 @@ struct BackgroundAgentController {
 
     private func mapServiceStatus(_ status: SMAppService.Status) -> BackgroundAgentState {
         switch status {
-        case .notRegistered:
+        case .notRegistered, .notFound:
             return .stopped
         case .enabled:
             return launchdEnabledState()
         case .requiresApproval:
             return .requiresApproval
-        case .notFound:
-            return .notFound
         @unknown default:
             return .failed("macOS returned an unknown background service state.")
         }
