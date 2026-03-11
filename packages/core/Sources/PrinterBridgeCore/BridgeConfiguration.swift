@@ -10,17 +10,20 @@ public struct BridgeConfiguration: Codable, Equatable, Sendable {
     public var selectedQueueName: String?
     public var advertisedNameOverride: String?
     public var exposureMode: BridgeExposureMode
+    public var keepRunningInBackground: Bool
 
     public init(
         isEnabled: Bool = false,
         selectedQueueName: String? = ProjectMetadata.primaryTargetPrinter,
         advertisedNameOverride: String? = nil,
-        exposureMode: BridgeExposureMode = .proxy
+        exposureMode: BridgeExposureMode = .proxy,
+        keepRunningInBackground: Bool = true
     ) {
         self.isEnabled = isEnabled
         self.selectedQueueName = selectedQueueName
         self.advertisedNameOverride = advertisedNameOverride
         self.exposureMode = exposureMode
+        self.keepRunningInBackground = keepRunningInBackground
     }
 }
 

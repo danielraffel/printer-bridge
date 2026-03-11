@@ -12,8 +12,13 @@ The initial target is a Brother HL-2170W environment verified through:
 This repository now has an initial scaffold:
 - [Product Spec](docs/product-spec.md)
 - shared Swift package core in `packages/core/`
-- macOS app and daemon scaffolding in `apps/macos/`
+- macOS app and daemon implementation in `apps/macos/`
 - development, deployment, validation, and CI script entry points in `scripts/`
+
+The current bridge runtime is:
+- proxy-first instead of direct shared-CUPS exposure
+- bundled with a separate `PrinterBridgeDaemon` executable inside the app
+- designed to run headlessly through a per-user LaunchAgent so the app window does not need to stay open
 
 ## Recommended Name
 
@@ -104,6 +109,12 @@ That emits a universal Release app bundle at:
 
 ```sh
 .build/dist/PrinterBridge.app
+```
+
+The Release bundle now also contains the headless daemon at:
+
+```sh
+.build/dist/PrinterBridge.app/Contents/Resources/PrinterBridgeDaemon
 ```
 
 Run the shared core tests:

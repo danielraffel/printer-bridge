@@ -29,7 +29,7 @@ struct ContentView: View {
         }
         .frame(width: 560, height: 470)
         .task {
-            model.loadBridgeState()
+            model.loadBridgeState(forceBackgroundSync: true)
         }
     }
 
@@ -170,6 +170,18 @@ struct ContentView: View {
 
     private var advancedSection: some View {
         VStack(alignment: .leading, spacing: 12) {
+            Toggle(
+                "Keep sharing in the background",
+                isOn: Binding(
+                    get: { model.bridgeConfiguration.keepRunningInBackground },
+                    set: { model.updateKeepRunningInBackground($0) }
+                )
+            )
+
+            Text("When enabled, PrinterBridge keeps AirPrint available after you close the window.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
             TextField("Use printer name", text: $model.advertisedNameDraft)
                 .textFieldStyle(.roundedBorder)
 

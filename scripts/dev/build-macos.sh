@@ -8,6 +8,9 @@ OUTPUT_DIR="$ROOT/.build/dist"
 OUTPUT_APP="$OUTPUT_DIR/PrinterBridge.app"
 ARM64_APP="$DERIVED_DATA_ARM64/Build/Products/Release/PrinterBridge.app"
 X86_64_APP="$DERIVED_DATA_X86_64/Build/Products/Release/PrinterBridge.app"
+ARM64_DAEMON="$DERIVED_DATA_ARM64/Build/Products/Release/PrinterBridgeDaemon"
+X86_64_DAEMON="$DERIVED_DATA_X86_64/Build/Products/Release/PrinterBridgeDaemon"
+OUTPUT_DAEMON="$OUTPUT_APP/Contents/Resources/PrinterBridgeDaemon"
 
 "$ROOT/scripts/dev/generate-xcode-project.sh"
 
@@ -40,5 +43,14 @@ lipo \
   "$X86_64_APP/Contents/MacOS/PrinterBridge" \
   -output "$OUTPUT_APP/Contents/MacOS/PrinterBridge"
 
+lipo \
+  -create \
+  "$ARM64_DAEMON" \
+  "$X86_64_DAEMON" \
+  -output "$OUTPUT_DAEMON"
+
+chmod 755 "$OUTPUT_DAEMON"
+
 codesign --force --deep --sign - "$OUTPUT_APP"
 file "$OUTPUT_APP/Contents/MacOS/PrinterBridge"
+file "$OUTPUT_DAEMON"

@@ -95,6 +95,7 @@ public enum SystemTool: CaseIterable {
     case ippfind
     case dnsSD
     case cancel
+    case launchctl
 
     public var path: String {
         switch self {
@@ -116,6 +117,8 @@ public enum SystemTool: CaseIterable {
             return "/usr/bin/dns-sd"
         case .cancel:
             return "/usr/bin/cancel"
+        case .launchctl:
+            return "/bin/launchctl"
         }
     }
 
@@ -123,7 +126,7 @@ public enum SystemTool: CaseIterable {
         switch self {
         case .swVers, .uname, .lpstat, .lp, .lpoptions, .ipptool, .ippfind:
             return true
-        case .dnsSD, .cancel:
+        case .dnsSD, .cancel, .launchctl:
             return false
         }
     }
