@@ -455,11 +455,11 @@ final class PrinterBridgeViewModel: ObservableObject {
         case .running, .loaded:
             publicationState = .advertising(summaryEndpointDescription(for: bridgeStatus))
         case .stopped:
-            if bridgeStatus.livePrinterCount > 0 {
-                publicationState = .advertising(summaryEndpointDescription(for: bridgeStatus))
-            } else {
-                publicationState = .waiting("The background service is starting.")
-            }
+            publicationState = .waiting("The background service is not running.")
+        case .requiresApproval:
+            publicationState = .waiting("Allow Printer Bridge in System Settings > General > Login Items to keep sharing in the background.")
+        case .notFound:
+            publicationState = .failed("The bundled background service is missing from the app.")
         case let .failed(reason):
             publicationState = .failed(reason)
         }
@@ -537,16 +537,12 @@ final class PrinterBridgeViewModel: ObservableObject {
 
     private func scheduleBackgroundAgentReconcile(using bridgeStatus: BridgeStatusSnapshot) {
         backgroundSyncTask?.cancel()
-        let configURL = configurationStore.configURL
         let forceRestart = hasSynchronizedBackgroundAgent
 
         backgroundSyncTask = Task {
             let backgroundState = await Task.detached(priority: .utility) {
                 do {
-                    return try BackgroundAgentController().ensureInstalled(
-                        configURL: configURL,
-                        forceRestart: forceRestart
-                    )
+                    return try BackgroundAgentController().ensureInstalled(forceRestart: forceRestart)
                 } catch {
                     return .failed(error.localizedDescription)
                 }

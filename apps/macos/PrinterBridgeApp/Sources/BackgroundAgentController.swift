@@ -1,11 +1,14 @@
 import Darwin
 import Foundation
 import PrinterBridgeCore
+import ServiceManagement
 
 enum BackgroundAgentState: Equatable {
     case stopped
     case running
     case loaded
+    case requiresApproval
+    case notFound
     case failed(String)
 }
 
@@ -13,69 +16,113 @@ struct BackgroundAgentController {
     private let runner: any CommandRunning
     private let fileManager: FileManager
     private let label: String
+    private let plistName: String
+    private let legacyLabel: String
 
     init(
         runner: any CommandRunning = ProcessCommandRunner(),
         fileManager: FileManager = .default,
-        label: String = ProjectMetadata.backgroundDaemonLabel
+        label: String = ProjectMetadata.backgroundAgentLabel,
+        plistName: String = ProjectMetadata.backgroundAgentPlistName,
+        legacyLabel: String = ProjectMetadata.legacyBackgroundDaemonLabel
     ) {
         self.runner = runner
         self.fileManager = fileManager
         self.label = label
+        self.plistName = plistName
+        self.legacyLabel = legacyLabel
     }
 
-    func ensureInstalled(configURL: URL, forceRestart: Bool) throws -> BackgroundAgentState {
-        let plistURL = try writeLaunchAgentPlist(configURL: configURL)
+    func ensureInstalled(forceRestart: Bool) throws -> BackgroundAgentState {
+        try validateBundledService()
+        try cleanupLegacyLaunchAgent()
 
-        if forceRestart {
-            _ = runner.run(executable: SystemTool.launchctl.path, arguments: ["bootout", domainTarget, plistURL.path])
-        } else {
-            let current = status()
-            if current == .running || current == .loaded {
-                return current
+        let service = serviceReference()
+        switch service.status {
+        case .enabled:
+            if forceRestart {
+                return restartRegisteredAgent()
             }
-        }
-
-        _ = runner.run(executable: SystemTool.launchctl.path, arguments: ["enable", serviceTarget])
-
-        let bootstrapResult = runner.run(
-            executable: SystemTool.launchctl.path,
-            arguments: ["bootstrap", domainTarget, plistURL.path]
-        )
-        if bootstrapResult.exitCode != 0 {
-            let output = bootstrapResult.combinedOutput.lowercased()
-            let alreadyLoaded = output.contains("already bootstrapped") || output.contains("service already loaded")
-            if !alreadyLoaded {
-                throw BackgroundAgentError.commandFailed(bootstrapResult.commandDescription, bootstrapResult.combinedOutput)
+            return launchdEnabledState()
+        case .requiresApproval:
+            return .requiresApproval
+        case .notFound:
+            return .notFound
+        case .notRegistered:
+            do {
+                try service.register()
+            } catch {
+                let currentState = mapServiceStatus(service.status)
+                switch currentState {
+                case .running, .loaded, .requiresApproval:
+                    return currentState
+                case .stopped, .notFound, .failed:
+                    throw BackgroundAgentError.commandFailed("SMAppService.register()", error.localizedDescription)
+                }
             }
-        }
 
-        let kickstartResult = runner.run(
-            executable: SystemTool.launchctl.path,
-            arguments: ["kickstart", "-k", serviceTarget]
-        )
-        if kickstartResult.exitCode != 0 {
-            throw BackgroundAgentError.commandFailed(kickstartResult.commandDescription, kickstartResult.combinedOutput)
-        }
+            if forceRestart {
+                return restartRegisteredAgent()
+            }
 
-        return status()
+            return mapServiceStatus(service.status)
+        @unknown default:
+            return .failed("macOS returned an unknown background service state.")
+        }
     }
 
     func disable() -> BackgroundAgentState {
-        let plistURL = launchAgentPlistURL
-        _ = runner.run(executable: SystemTool.launchctl.path, arguments: ["bootout", domainTarget, plistURL.path])
-        _ = runner.run(executable: SystemTool.launchctl.path, arguments: ["disable", serviceTarget])
+        do {
+            try cleanupLegacyLaunchAgent()
+            let service = serviceReference()
+            if service.status != .notRegistered {
+                try service.unregister()
+            }
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+
+        _ = runner.run(executable: SystemTool.launchctl.path, arguments: ["bootout", serviceTarget])
         return .stopped
     }
 
     func status() -> BackgroundAgentState {
+        do {
+            try validateBundledService()
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+
+        return mapServiceStatus(serviceReference().status)
+    }
+
+    private var serviceTarget: String {
+        "\(domainTarget)/\(label)"
+    }
+
+    private var domainTarget: String {
+        "gui/\(getuid())"
+    }
+
+    private var legacyLaunchAgentPlistURL: URL {
+        fileManager.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("LaunchAgents", isDirectory: true)
+            .appendingPathComponent("\(legacyLabel).plist", isDirectory: false)
+    }
+
+    private func serviceReference() -> SMAppService {
+        SMAppService.agent(plistName: plistName)
+    }
+
+    private func launchdEnabledState() -> BackgroundAgentState {
         let result = runner.run(
             executable: SystemTool.launchctl.path,
             arguments: ["print", serviceTarget]
         )
 
         guard result.exitCode == 0 else {
-            return .stopped
+            return .loaded
         }
 
         let output = result.combinedOutput
@@ -89,33 +136,45 @@ struct BackgroundAgentController {
         return .loaded
     }
 
-    var launchAgentPlistURL: URL {
-        fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("LaunchAgents", isDirectory: true)
-            .appendingPathComponent("\(label).plist", isDirectory: false)
+    private func restartRegisteredAgent() -> BackgroundAgentState {
+        let kickstartResult = runner.run(
+            executable: SystemTool.launchctl.path,
+            arguments: ["kickstart", "-k", serviceTarget]
+        )
+
+        if kickstartResult.exitCode != 0 {
+            return mapServiceStatus(serviceReference().status)
+        }
+
+        return launchdEnabledState()
     }
 
-    private var serviceTarget: String {
-        "\(domainTarget)/\(label)"
+    private func mapServiceStatus(_ status: SMAppService.Status) -> BackgroundAgentState {
+        switch status {
+        case .notRegistered:
+            return .stopped
+        case .enabled:
+            return launchdEnabledState()
+        case .requiresApproval:
+            return .requiresApproval
+        case .notFound:
+            return .notFound
+        @unknown default:
+            return .failed("macOS returned an unknown background service state.")
+        }
     }
 
-    private var domainTarget: String {
-        "gui/\(getuid())"
-    }
+    private func validateBundledService(bundle: Bundle = .main) throws {
+        let daemonURL = try bundledDaemonURL(bundle: bundle)
+        let agentPlistURL = try bundledLaunchAgentPlistURL(bundle: bundle)
 
-    private var logsDirectoryURL: URL {
-        fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("Logs", isDirectory: true)
-            .appendingPathComponent(ProjectMetadata.productName, isDirectory: true)
-    }
+        guard fileManager.isExecutableFile(atPath: daemonURL.path) else {
+            throw BackgroundAgentError.missingBundledDaemon(daemonURL.path)
+        }
 
-    private var supportDirectoryURL: URL {
-        fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent(ProjectMetadata.productName, isDirectory: true)
+        guard fileManager.fileExists(atPath: agentPlistURL.path) else {
+            throw BackgroundAgentError.missingBundledLaunchAgent(agentPlistURL.path)
+        }
     }
 
     private func bundledDaemonURL(bundle: Bundle = .main) throws -> URL {
@@ -123,44 +182,33 @@ struct BackgroundAgentController {
             throw BackgroundAgentError.missingResourceDirectory
         }
 
-        let daemonURL = resourceURL.appendingPathComponent("PrinterBridgeDaemon", isDirectory: false)
-        guard fileManager.isExecutableFile(atPath: daemonURL.path) else {
-            throw BackgroundAgentError.missingBundledDaemon(daemonURL.path)
-        }
-
-        return daemonURL
+        return resourceURL.appendingPathComponent("PrinterBridgeDaemon", isDirectory: false)
     }
 
-    private func writeLaunchAgentPlist(configURL: URL) throws -> URL {
-        let daemonURL = try bundledDaemonURL()
+    private func bundledLaunchAgentPlistURL(bundle: Bundle = .main) throws -> URL {
+        let plistURL = bundle.bundleURL
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Library", isDirectory: true)
+            .appendingPathComponent("LaunchAgents", isDirectory: true)
+            .appendingPathComponent(plistName, isDirectory: false)
 
-        try fileManager.createDirectory(at: launchAgentPlistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: logsDirectoryURL, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: supportDirectoryURL, withIntermediateDirectories: true)
+        return plistURL
+    }
 
-        let plist: [String: Any] = [
-            "Label": label,
-            "ProgramArguments": [daemonURL.path],
-            "RunAtLoad": true,
-            "KeepAlive": true,
-            "ProcessType": "Background",
-            "WorkingDirectory": supportDirectoryURL.path,
-            "StandardOutPath": logsDirectoryURL.appendingPathComponent("daemon.log").path,
-            "StandardErrorPath": logsDirectoryURL.appendingPathComponent("daemon-error.log").path,
-            "EnvironmentVariables": [
-                BridgeConfigurationStore.environmentOverrideKey: configURL.path,
-            ],
-        ]
+    private func cleanupLegacyLaunchAgent() throws {
+        _ = runner.run(executable: SystemTool.launchctl.path, arguments: ["bootout", "\(domainTarget)/\(legacyLabel)"])
+        _ = runner.run(executable: SystemTool.launchctl.path, arguments: ["disable", "\(domainTarget)/\(legacyLabel)"])
 
-        let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
-        try data.write(to: launchAgentPlistURL, options: .atomic)
-        return launchAgentPlistURL
+        if fileManager.fileExists(atPath: legacyLaunchAgentPlistURL.path) {
+            try fileManager.removeItem(at: legacyLaunchAgentPlistURL)
+        }
     }
 }
 
 enum BackgroundAgentError: LocalizedError {
     case missingResourceDirectory
     case missingBundledDaemon(String)
+    case missingBundledLaunchAgent(String)
     case commandFailed(String, String)
 
     var errorDescription: String? {
@@ -169,6 +217,8 @@ enum BackgroundAgentError: LocalizedError {
             return "The app bundle is missing its resources directory."
         case let .missingBundledDaemon(path):
             return "PrinterBridgeDaemon was not found inside the app bundle at \(path)."
+        case let .missingBundledLaunchAgent(path):
+            return "The bundled background agent plist was not found at \(path)."
         case let .commandFailed(command, output):
             let normalizedOutput = output.trimmingCharacters(in: .whitespacesAndNewlines)
             if normalizedOutput.isEmpty {

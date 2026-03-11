@@ -14,7 +14,9 @@ public enum ProjectMetadata {
     public static let verificationHostAlias = "macmini"
     public static let primaryTargetPrinter = "Brother_HL_2170W_series"
     public static let defaultProxyPort = 8631
-    public static let backgroundDaemonLabel = "com.danielraffel.printerbridge.daemon"
+    public static let backgroundAgentLabel = "com.danielraffel.printerbridge.agent"
+    public static let backgroundAgentPlistName = "com.danielraffel.printerbridge.agent.plist"
+    public static let legacyBackgroundDaemonLabel = "com.danielraffel.printerbridge.daemon"
     public static let developmentHostDescription = "Apple Silicon MacBook Pro running macOS 26.x"
     public static let verificationHostDescription = "Intel Mac mini running macOS 15.7.4"
 }

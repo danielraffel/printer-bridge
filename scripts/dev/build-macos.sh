@@ -11,6 +11,8 @@ X86_64_APP="$DERIVED_DATA_X86_64/Build/Products/Release/PrinterBridge.app"
 ARM64_DAEMON="$DERIVED_DATA_ARM64/Build/Products/Release/PrinterBridgeDaemon"
 X86_64_DAEMON="$DERIVED_DATA_X86_64/Build/Products/Release/PrinterBridgeDaemon"
 OUTPUT_DAEMON="$OUTPUT_APP/Contents/Resources/PrinterBridgeDaemon"
+AGENT_PLIST_SOURCE="$ROOT/apps/macos/PrinterBridgeApp/Support/LaunchAgents/com.danielraffel.printerbridge.agent.plist"
+OUTPUT_AGENT_PLIST_DIR="$OUTPUT_APP/Contents/Library/LaunchAgents"
 
 resolve_codesign_identity() {
   if [ -n "${PRINTERBRIDGE_CODESIGN_IDENTITY:-}" ]; then
@@ -48,6 +50,8 @@ xcodebuild \
   build
 
 ditto "$ARM64_APP" "$OUTPUT_APP"
+mkdir -p "$OUTPUT_AGENT_PLIST_DIR"
+cp "$AGENT_PLIST_SOURCE" "$OUTPUT_AGENT_PLIST_DIR/"
 
 lipo \
   -create \
