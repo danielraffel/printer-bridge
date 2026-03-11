@@ -90,3 +90,23 @@ func configurationSetEnabledCreatesManagedPrinterEntry() {
     #expect(configuration.printers.first?.queueName == "Hallway_Printer")
     #expect(configuration.printers.first?.isEnabled == true)
 }
+
+@Test
+func configurationNormalizesLegacyPrinterBridgeSpacingInAdvertisedName() {
+    var configuration = BridgeConfiguration(
+        selectedQueueName: "Brother_HL_2170W_series",
+        printers: [
+            ManagedPrinterConfiguration(
+                queueName: "Brother_HL_2170W_series",
+                isEnabled: true,
+                advertisedNameOverride: "Brother HL-2170W series via PrinterBridge",
+                proxyPort: ProjectMetadata.defaultProxyPort
+            )
+        ],
+        exposureMode: .proxy
+    )
+
+    configuration.normalize()
+
+    #expect(configuration.printers.first?.advertisedNameOverride == "Brother HL-2170W series via Printer Bridge")
+}

@@ -282,7 +282,7 @@
 
         .gallery {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 18px;
         }
 
@@ -454,6 +454,10 @@
                     <figure class="gallery-card">
                         <img src="./assets/gallery/printers-daemon.png" alt="Printer Bridge background sharing status">
                         <figcaption class="gallery-caption">Background sharing keeps AirPrint available even after setup is done.</figcaption>
+                    </figure>
+                    <figure class="gallery-card">
+                        <img src="./assets/gallery/airprint-iphone.png" alt="iPhone printing to a printer shared by Printer Bridge">
+                        <figcaption class="gallery-caption">Print from iPhone and other AirPrint devices through a printer shared by Printer Bridge.</figcaption>
                     </figure>
                 </div>
             </div>

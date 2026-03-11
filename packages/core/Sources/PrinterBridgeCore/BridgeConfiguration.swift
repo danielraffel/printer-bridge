@@ -257,8 +257,10 @@ public struct BridgeConfiguration: Codable, Equatable, Sendable {
                 continue
             }
 
-            let advertisedNameOverride = printer.advertisedNameOverride?
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let advertisedNameOverride = normalizedAdvertisedNameOverride(
+                printer.advertisedNameOverride?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            )
             normalizedPrinters.append(
                 ManagedPrinterConfiguration(
                     queueName: queueName,
@@ -289,6 +291,14 @@ public struct BridgeConfiguration: Codable, Equatable, Sendable {
         printers = normalizedPrinters.sorted { lhs, rhs in
             lhs.queueName.localizedCaseInsensitiveCompare(rhs.queueName) == .orderedAscending
         }
+    }
+
+    private func normalizedAdvertisedNameOverride(_ value: String?) -> String? {
+        guard let value, !value.isEmpty else {
+            return value
+        }
+
+        return value.replacingOccurrences(of: " via PrinterBridge", with: " via Printer Bridge")
     }
 }
 
