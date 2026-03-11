@@ -12,6 +12,7 @@ ARM64_DAEMON="$DERIVED_DATA_ARM64/Build/Products/Release/PrinterBridgeDaemon"
 X86_64_DAEMON="$DERIVED_DATA_X86_64/Build/Products/Release/PrinterBridgeDaemon"
 OUTPUT_DAEMON="$OUTPUT_APP/Contents/Resources/PrinterBridgeDaemon"
 
+"$ROOT/scripts/dev/generate-app-icon-set.sh"
 "$ROOT/scripts/dev/generate-xcode-project.sh"
 
 rm -rf "$DERIVED_DATA_ARM64" "$DERIVED_DATA_X86_64" "$OUTPUT_APP"

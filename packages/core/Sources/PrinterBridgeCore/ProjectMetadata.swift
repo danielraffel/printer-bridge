@@ -2,6 +2,9 @@ import Foundation
 
 public enum ProjectMetadata {
     public static let productName = "PrinterBridge"
+    public static let appDisplayName = "Printer Bridge"
+    public static let appStoreName = "Printer Bridge for AirPrint"
+    public static let serviceDisplayName = "Printer Bridge"
     public static let repositorySlug = "printer-bridge"
     public static let minimumSupportedMacOS = "15.0"
     public static let verificationHostAlias = "macmini"
@@ -64,6 +67,8 @@ public struct SmokeTestResult: Sendable {
 public enum ProjectDiagnostics {
     public static let overviewText = """
         \(ProjectMetadata.productName)
+        app: \(ProjectMetadata.appDisplayName)
+        app store: \(ProjectMetadata.appStoreName)
         repo: \(ProjectMetadata.repositorySlug)
         minimum macOS: \(ProjectMetadata.minimumSupportedMacOS)
         verification host alias: \(ProjectMetadata.verificationHostAlias)

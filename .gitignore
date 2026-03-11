@@ -24,6 +24,7 @@ Package.resolved
 coverage/
 test-results/
 artifacts/
+assets/branding/generated/
 
 # Local environment
 .env

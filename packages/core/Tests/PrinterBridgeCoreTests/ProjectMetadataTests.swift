@@ -4,6 +4,8 @@ import Testing
 @Test
 func productIdentityMatchesRepoPlan() {
     #expect(ProjectMetadata.productName == "PrinterBridge")
+    #expect(ProjectMetadata.appDisplayName == "Printer Bridge")
+    #expect(ProjectMetadata.appStoreName == "Printer Bridge for AirPrint")
     #expect(ProjectMetadata.repositorySlug == "printer-bridge")
     #expect(ProjectMetadata.minimumSupportedMacOS == "15.0")
     #expect(ProjectMetadata.primaryTargetPrinter == "Brother_HL_2170W_series")

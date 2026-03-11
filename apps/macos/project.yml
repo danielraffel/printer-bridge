@@ -29,7 +29,8 @@ targets:
         PRODUCT_NAME: PrinterBridge
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        INFOPLIST_KEY_CFBundleDisplayName: PrinterBridge
+        INFOPLIST_KEY_CFBundleDisplayName: "Printer Bridge"
+        INFOPLIST_KEY_CFBundleName: "Printer Bridge"
         INFOPLIST_KEY_LSMinimumSystemVersion: "15.0"
         CURRENT_PROJECT_VERSION: 1
         MARKETING_VERSION: 0.1.0

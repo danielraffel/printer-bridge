@@ -65,24 +65,22 @@ final class PrinterBridgeViewModel: ObservableObject {
 
     private let configurationStore: BridgeConfigurationStore
     private let runtimeService: BridgeRuntimeService
-    private let jobQueueService: PrintJobQueueService
     private let backgroundAgentController: BackgroundAgentController
 
     private var activeSession: BridgeRuntimeSession?
     private var activeAdvertisement: AirPrintAdvertisementPlan?
     private var refreshTask: Task<Void, Never>?
     private var jobsTask: Task<Void, Never>?
+    private var backgroundSyncTask: Task<Void, Never>?
     private var hasSynchronizedBackgroundAgent = false
 
     init(
         configurationStore: BridgeConfigurationStore = BridgeConfigurationStore(),
         runtimeService: BridgeRuntimeService = BridgeRuntimeService(),
-        jobQueueService: PrintJobQueueService = PrintJobQueueService(),
         backgroundAgentController: BackgroundAgentController = BackgroundAgentController()
     ) {
         self.configurationStore = configurationStore
         self.runtimeService = runtimeService
-        self.jobQueueService = jobQueueService
         self.backgroundAgentController = backgroundAgentController
     }
 
@@ -107,16 +105,16 @@ final class PrinterBridgeViewModel: ObservableObject {
         switch publicationState {
         case .inactive:
             return bridgeConfiguration.keepRunningInBackground
-                ? "PrinterBridge is ready to run in the background when AirPrint is enabled."
+                ? "\(ProjectMetadata.appDisplayName) is ready to run in the background when AirPrint is enabled."
                 : "AirPrint is off."
         case .waiting:
-            return "PrinterBridge needs more information before it can share this printer."
+            return "\(ProjectMetadata.appDisplayName) needs more information before it can share this printer."
         case .advertising:
             return bridgeConfiguration.keepRunningInBackground
                 ? "Ready to print from Apple devices even after this window closes."
                 : "Ready to print from Apple devices on this network."
         case .failed:
-            return "PrinterBridge could not start sharing."
+            return "\(ProjectMetadata.appDisplayName) could not start sharing."
         }
     }
 
@@ -227,29 +225,50 @@ final class PrinterBridgeViewModel: ObservableObject {
             return
         }
 
-        let queueName = bridgeConfiguration.selectedQueueName
-        jobsTask?.cancel()
-        jobsTask = Task {
-            let canceled = await Task.detached(priority: .utility) {
-                PrintJobQueueService().cancelAllActiveJobs(forQueueNamed: queueName)
-            }.value
+        performJobsOperation(
+            successMessage: "Canceled active jobs.",
+            failureMessage: "Could not cancel active jobs."
+        ) { [queueName = bridgeConfiguration.selectedQueueName] in
+            PrintJobQueueService().cancelAllActiveJobs(forQueueNamed: queueName)
+        }
+    }
 
-            guard !Task.isCancelled else {
-                return
-            }
+    func cancelJob(_ job: PrintJob) {
+        performJobsOperation(
+            successMessage: "Canceled \(job.id).",
+            failureMessage: "Could not cancel \(job.id)."
+        ) {
+            PrintJobQueueService().cancelActiveJob(job)
+        }
+    }
 
-            if canceled {
-                jobsMessage = "Canceled active jobs."
-                reloadJobs()
-            } else {
-                jobsMessage = "Could not cancel active jobs."
-            }
+    func clearRecentJobs() {
+        guard !recentCompletedJobs.isEmpty else {
+            jobsMessage = "No recent jobs to clear."
+            return
+        }
+
+        performJobsOperation(
+            successMessage: "Cleared recent jobs.",
+            failureMessage: "Could not clear recent jobs."
+        ) { [jobs = recentCompletedJobs] in
+            PrintJobQueueService().purgeCompletedJobs(jobs)
+        }
+    }
+
+    func clearRecentJob(_ job: PrintJob) {
+        performJobsOperation(
+            successMessage: "Cleared \(job.id) from recent jobs.",
+            failureMessage: "Could not clear \(job.id)."
+        ) {
+            PrintJobQueueService().purgeCompletedJob(job)
         }
     }
 
     func handleAppWillTerminate() {
         refreshTask?.cancel()
         jobsTask?.cancel()
+        backgroundSyncTask?.cancel()
         stopActivePublication()
     }
 
@@ -262,6 +281,28 @@ final class PrinterBridgeViewModel: ObservableObject {
         } catch {
             publicationState = .failed(error.localizedDescription)
             bridgeMessage = "Failed to save settings: \(error.localizedDescription)"
+        }
+    }
+
+    private func performJobsOperation(
+        successMessage: String,
+        failureMessage: String,
+        operation: @escaping @Sendable () -> Bool
+    ) {
+        jobsTask?.cancel()
+        jobsTask = Task {
+            let succeeded = await Task.detached(priority: .utility, operation: operation).value
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            if succeeded {
+                jobsMessage = successMessage
+                reloadJobs()
+            } else {
+                jobsMessage = failureMessage
+            }
         }
     }
 
@@ -291,23 +332,13 @@ final class PrinterBridgeViewModel: ObservableObject {
         if bridgeConfiguration.keepRunningInBackground {
             stopActivePublication()
 
-            let backgroundState: BackgroundAgentState
             if reconcileBackground {
-                do {
-                    backgroundState = try backgroundAgentController.ensureInstalled(
-                        configURL: configurationStore.configURL,
-                        forceRestart: hasSynchronizedBackgroundAgent
-                    )
-                    hasSynchronizedBackgroundAgent = true
-                } catch {
-                    publicationState = .failed(error.localizedDescription)
-                    bridgeMessage = error.localizedDescription
-                    return
-                }
-            } else {
-                backgroundState = backgroundAgentController.status()
+                publicationState = .waiting("Starting background service.")
+                scheduleBackgroundAgentReconcile(using: bridgeStatus)
+                return
             }
 
+            let backgroundState = backgroundAgentController.status()
             syncBackgroundPublication(using: bridgeStatus, backgroundState: backgroundState)
             return
         }
@@ -382,6 +413,39 @@ final class PrinterBridgeViewModel: ObservableObject {
         activeSession = nil
         activeAdvertisement = nil
         lastBonjourEvent = nil
+    }
+
+    private func scheduleBackgroundAgentReconcile(using bridgeStatus: BridgeStatusSnapshot) {
+        backgroundSyncTask?.cancel()
+        let configURL = configurationStore.configURL
+        let forceRestart = hasSynchronizedBackgroundAgent
+
+        backgroundSyncTask = Task {
+            let backgroundState = await Task.detached(priority: .utility) {
+                do {
+                    return try BackgroundAgentController().ensureInstalled(
+                        configURL: configURL,
+                        forceRestart: forceRestart
+                    )
+                } catch {
+                    return .failed(error.localizedDescription)
+                }
+            }.value
+
+            guard !Task.isCancelled else {
+                return
+            }
+
+            if backgroundState == .running || backgroundState == .loaded {
+                hasSynchronizedBackgroundAgent = true
+            }
+
+            if case let .failed(reason) = backgroundState {
+                bridgeMessage = reason
+            }
+
+            syncBackgroundPublication(using: bridgeStatus, backgroundState: backgroundState)
+        }
     }
 
     private func recordBonjourEvent(from chunk: String) {

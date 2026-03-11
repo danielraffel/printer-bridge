@@ -42,3 +42,54 @@ func printJobSnapshotParsesActiveAndCompletedJobs() {
     #expect(snapshot.completedJobs.count == 2)
     #expect(snapshot.completedJobs.first?.id == "Brother_HL_2170W_series-500")
 }
+
+@Test
+func printJobQueueServiceSupportsCancelAndPurgeOperations() {
+    let runner = RecordingJobCommandRunner()
+    let service = PrintJobQueueService(runner: runner)
+
+    let activeJob = PrintJob(
+        id: "Brother_HL_2170W_series-501",
+        queueName: "Brother_HL_2170W_series",
+        jobNumber: 501,
+        owner: "mobile",
+        sizeBytes: 4096,
+        submittedAt: "Tue Mar 10 17:59:01 2026",
+        state: .active,
+        rawLine: ""
+    )
+    let completedJob = PrintJob(
+        id: "Brother_HL_2170W_series-500",
+        queueName: "Brother_HL_2170W_series",
+        jobNumber: 500,
+        owner: "mobile",
+        sizeBytes: 2048,
+        submittedAt: "Tue Mar 10 17:52:00 2026",
+        state: .completed,
+        rawLine: ""
+    )
+
+    #expect(service.cancelActiveJob(activeJob))
+    #expect(service.purgeCompletedJob(completedJob))
+    #expect(service.purgeCompletedJobs([completedJob]))
+    #expect(runner.commands == [
+        "/usr/bin/cancel Brother_HL_2170W_series-501",
+        "/usr/bin/cancel -x Brother_HL_2170W_series-500",
+        "/usr/bin/cancel -x Brother_HL_2170W_series-500",
+    ])
+}
+
+private final class RecordingJobCommandRunner: CommandRunning {
+    private(set) var commands: [String] = []
+
+    func run(executable: String, arguments: [String]) -> CommandResult {
+        commands.append(([executable] + arguments).joined(separator: " "))
+        return CommandResult(
+            executable: executable,
+            arguments: arguments,
+            exitCode: 0,
+            standardOutput: "",
+            standardError: ""
+        )
+    }
+}

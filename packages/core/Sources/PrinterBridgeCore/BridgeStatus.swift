@@ -239,7 +239,7 @@ public struct BridgeStatusService {
         let baseServiceName = inspection.detail.description
             ?? inspection.summary.name.replacingOccurrences(of: "_", with: " ")
         let serviceName = configuration.advertisedNameOverride
-            ?? "\(baseServiceName) via \(ProjectMetadata.productName)"
+            ?? "\(baseServiceName) via \(ProjectMetadata.serviceDisplayName)"
 
         let encodedQueueName = inspection.summary.name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? inspection.summary.name

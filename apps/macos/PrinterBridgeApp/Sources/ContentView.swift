@@ -101,6 +101,11 @@ struct ContentView: View {
                     model.cancelActiveJobs()
                 }
                 .disabled(model.jobSnapshot.activeJobs.isEmpty)
+
+                Button("Clear Recent") {
+                    model.clearRecentJobs()
+                }
+                .disabled(model.recentCompletedJobs.isEmpty)
             }
 
             List {
@@ -109,7 +114,9 @@ struct ContentView: View {
                         emptyJobsRow("No active jobs.")
                     } else {
                         ForEach(model.jobSnapshot.activeJobs) { job in
-                            jobRow(job, stateLabel: "Printing")
+                            jobRow(job, stateLabel: "Printing") {
+                                model.cancelJob(job)
+                            }
                         }
                     }
                 }
@@ -119,7 +126,9 @@ struct ContentView: View {
                         emptyJobsRow("No recent jobs.")
                     } else {
                         ForEach(model.recentCompletedJobs) { job in
-                            jobRow(job, stateLabel: "Completed")
+                            jobRow(job, stateLabel: "Completed") {
+                                model.clearRecentJob(job)
+                            }
                         }
                     }
                 }
@@ -178,7 +187,7 @@ struct ContentView: View {
                 )
             )
 
-            Text("When enabled, PrinterBridge keeps AirPrint available after you close the window.")
+            Text("When enabled, \(ProjectMetadata.appDisplayName) keeps AirPrint available after you close the window.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -255,7 +264,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func jobRow(_ job: PrintJob, stateLabel: String) -> some View {
+    private func jobRow(_ job: PrintJob, stateLabel: String, action: @escaping () -> Void) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: stateLabel == "Printing" ? "printer.fill" : "checkmark.circle.fill")
                 .foregroundStyle(stateLabel == "Printing" ? .blue : .green)
@@ -280,6 +289,12 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Button(action: action) {
+                Image(systemName: stateLabel == "Printing" ? "xmark.circle" : "trash")
+            }
+            .buttonStyle(.borderless)
+            .help(stateLabel == "Printing" ? "Cancel job" : "Clear from recent jobs")
         }
         .padding(.vertical, 2)
     }

@@ -188,7 +188,7 @@ func bridgeStatusUsesHostDisplayNameWhenNoOverrideIsSet() {
 
     let snapshot = statusService.evaluate(configuration: configuration)
 
-    #expect(snapshot.advertisement?.serviceName == "Brother HL-2170W series via PrinterBridge")
+    #expect(snapshot.advertisement?.serviceName == "Brother HL-2170W series via Printer Bridge")
 }
 
 @Test
