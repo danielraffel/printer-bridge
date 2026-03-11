@@ -43,7 +43,7 @@ struct ContentView: View {
                         .font(.headline)
 
                     if model.printerStatuses.isEmpty {
-                        Text("No printers found on this Mac.")
+                        Text("No printers are available. Add a printer in System Settings to see it here.")
                             .foregroundStyle(.secondary)
                     } else {
                         ScrollView {
@@ -157,11 +157,9 @@ struct ContentView: View {
                     Text(model.statusSummary)
                         .foregroundStyle(.secondary)
 
-                    if model.enabledPrinterCount > 0 {
-                        Text("\(model.livePrinterCount) live of \(model.enabledPrinterCount) enabled")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(model.printerEnablementSummary)
+                        .font(.footnote)
+                        .foregroundStyle(enablementSummaryColor)
 
                     if let statusDetail = model.statusDetail {
                         Text(statusDetail)
@@ -263,6 +261,14 @@ struct ContentView: View {
         }
     }
 
+    private var enablementSummaryColor: Color {
+        if model.printerStatuses.isEmpty || model.enabledPrinterCount == 0 {
+            return .orange
+        }
+
+        return .green
+    }
+
     private var selectedQueueBinding: Binding<String?> {
         Binding(
             get: { model.bridgeConfiguration.selectedQueueName },
@@ -272,12 +278,6 @@ struct ContentView: View {
 
     private func printerRow(_ printer: ManagedPrinterStatus) -> some View {
         HStack(alignment: .top, spacing: 12) {
-            Toggle(
-                isOn: Binding(
-                    get: { printer.configuration.isEnabled },
-                    set: { model.setPrinterEnabled($0, forQueueNamed: printer.configuration.queueName) }
-                )
-            ) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(queueDisplayName(printer.configuration.queueName))
                         .font(.body.weight(.medium))
@@ -285,18 +285,28 @@ struct ContentView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
-            }
-            .toggleStyle(.switch)
 
             Spacer(minLength: 8)
 
-            Text(printer.activationState == .ready && printer.configuration.isEnabled ? "Live" : printerRowStateTitle(printer))
-                .font(.footnote.weight(.semibold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(printerRowTint(printer).opacity(0.16))
-                .foregroundStyle(printerRowTint(printer))
-                .clipShape(Capsule())
+            HStack(spacing: 10) {
+                Text(printer.activationState == .ready && printer.configuration.isEnabled ? "Live" : printerRowStateTitle(printer))
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(printerRowTint(printer).opacity(0.16))
+                    .foregroundStyle(printerRowTint(printer))
+                    .clipShape(Capsule())
+
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { printer.configuration.isEnabled },
+                        set: { model.setPrinterEnabled($0, forQueueNamed: printer.configuration.queueName) }
+                    )
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+            }
         }
         .padding(12)
         .background(

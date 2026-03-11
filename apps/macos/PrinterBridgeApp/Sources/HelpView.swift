@@ -44,6 +44,18 @@ struct HelpView: View {
                         "`Endpoint` shows the IPP address currently being advertised for the selected printer.",
                     ]
                 )
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Open Source")
+                        .font(.headline)
+
+                    Text("Source code is available on GitHub. PRs are welcome, and you can use the issue templates there for bug reports and feature requests.")
+                        .foregroundStyle(.secondary)
+
+                    Link("View Source on GitHub", destination: URL(string: ProjectMetadata.repositoryURL)!)
+                    Link("Report a Bug", destination: URL(string: ProjectMetadata.bugReportURL)!)
+                    Link("Request a Feature", destination: URL(string: ProjectMetadata.featureRequestURL)!)
+                }
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)

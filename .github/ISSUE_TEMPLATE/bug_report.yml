@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a problem with Printer Bridge
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please include enough detail to reproduce the problem on your Mac and printer setup.
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: macOS 15.7.4
+    validations:
+      required: true
+  - type: input
+    id: printer
+    attributes:
+      label: Printer model
+      placeholder: Brother HL-2170W series
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: Tell us what you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Extra details
+      placeholder: Include screenshots, logs, or anything else that might help.

@@ -27,6 +27,11 @@ struct PrinterBridgeApp: App {
                 .frame(width: 500, height: 560)
         }
         .windowResizability(.contentSize)
+
+        Window("About \(ProjectMetadata.appDisplayName)", id: "about") {
+            AboutView()
+        }
+        .windowResizability(.contentSize)
     }
 }
 
@@ -34,6 +39,12 @@ private struct PrinterBridgeCommands: Commands {
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
+        CommandGroup(replacing: .appInfo) {
+            Button("About \(ProjectMetadata.appDisplayName)") {
+                openWindow(id: "about")
+            }
+        }
+
         CommandGroup(replacing: .help) {
             Button("\(ProjectMetadata.appDisplayName) Help") {
                 openWindow(id: "help")

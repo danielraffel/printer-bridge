@@ -66,6 +66,7 @@ final class PrinterBridgeViewModel: ObservableObject {
     private let configurationStore: BridgeConfigurationStore
     private let runtimeService: BridgeRuntimeService
     private let backgroundAgentController: BackgroundAgentController
+    private let statusService: BridgeStatusService
 
     private var activeSessions: [String: BridgeRuntimeSession] = [:]
     private var activeAdvertisements: [String: AirPrintAdvertisementPlan] = [:]
@@ -77,11 +78,13 @@ final class PrinterBridgeViewModel: ObservableObject {
     init(
         configurationStore: BridgeConfigurationStore = BridgeConfigurationStore(),
         runtimeService: BridgeRuntimeService = BridgeRuntimeService(),
-        backgroundAgentController: BackgroundAgentController = BackgroundAgentController()
+        backgroundAgentController: BackgroundAgentController = BackgroundAgentController(),
+        statusService: BridgeStatusService = BridgeStatusService()
     ) {
         self.configurationStore = configurationStore
         self.runtimeService = runtimeService
         self.backgroundAgentController = backgroundAgentController
+        self.statusService = statusService
     }
 
     var selectedQueueTitle: String {
@@ -120,12 +123,15 @@ final class PrinterBridgeViewModel: ObservableObject {
     var statusSummary: String {
         switch publicationState {
         case .inactive:
-            return "Select one or more printers to share over AirPrint."
+            if printerStatuses.isEmpty {
+                return "Add a printer in System Settings to see it here."
+            }
+            return "Turn on AirPrint for the printers you want to share."
         case .waiting:
             if enabledPrinterCount > 0 {
                 return "\(ProjectMetadata.appDisplayName) is still setting up one or more enabled printers."
             }
-            return "\(ProjectMetadata.appDisplayName) needs more information before it can share printers."
+            return "Turn on AirPrint for the printers you want to share."
         case .advertising:
             if livePrinterCount == 1 {
                 return "1 printer is ready to print from Apple devices on this network."
@@ -134,6 +140,28 @@ final class PrinterBridgeViewModel: ObservableObject {
         case .failed:
             return "\(ProjectMetadata.appDisplayName) could not start sharing."
         }
+    }
+
+    var printerEnablementSummary: String {
+        let totalPrinterCount = printerStatuses.count
+
+        guard totalPrinterCount > 0 else {
+            return "No printers are available for AirPrint."
+        }
+
+        guard enabledPrinterCount > 0 else {
+            return "No printers are enabled for AirPrint."
+        }
+
+        guard enabledPrinterCount == totalPrinterCount else {
+            return "\(enabledPrinterCount) of \(totalPrinterCount) printers are enabled for AirPrint."
+        }
+
+        if totalPrinterCount == 1 {
+            return "All printers are enabled for AirPrint."
+        }
+
+        return "All \(totalPrinterCount) printers are enabled for AirPrint."
     }
 
     var statusDetail: String? {
@@ -204,10 +232,12 @@ final class PrinterBridgeViewModel: ObservableObject {
     func setPrinterEnabled(_ enabled: Bool, forQueueNamed queueName: String) {
         bridgeConfiguration.setEnabled(enabled, forQueueNamed: queueName)
         bridgeConfiguration.setSelectedQueueName(queueName)
+        applyOptimisticStatus()
         persistConfiguration(
             message: enabled
                 ? "AirPrint enabled for \(queueDisplayName(queueName))."
-                : "AirPrint disabled for \(queueDisplayName(queueName))."
+                : "AirPrint disabled for \(queueDisplayName(queueName)).",
+            forceBackgroundSync: bridgeConfiguration.keepRunningInBackground && !hasSynchronizedBackgroundAgent
         )
     }
 
@@ -297,16 +327,38 @@ final class PrinterBridgeViewModel: ObservableObject {
         stopActivePublication()
     }
 
-    private func persistConfiguration(message: String) {
-        do {
-            bridgeConfiguration.exposureMode = .proxy
-            bridgeConfiguration.normalize()
-            try configurationStore.save(bridgeConfiguration)
-            bridgeMessage = message
-            loadBridgeState(forceBackgroundSync: true)
-        } catch {
-            publicationState = .failed(error.localizedDescription)
-            bridgeMessage = "Failed to save settings: \(error.localizedDescription)"
+    private func persistConfiguration(message: String, forceBackgroundSync: Bool = true) {
+        refreshTask?.cancel()
+        let configurationToSave = bridgeConfiguration
+        let configURL = configurationStore.configURL
+        bridgeMessage = message
+
+        refreshTask = Task {
+            do {
+                let payload = try await Task.detached(priority: .userInitiated) {
+                    var normalizedConfiguration = configurationToSave
+                    normalizedConfiguration.exposureMode = .proxy
+                    normalizedConfiguration.normalize()
+
+                    let store = BridgeConfigurationStore(configURL: configURL)
+                    try store.save(normalizedConfiguration)
+
+                    return Self.buildRefreshPayload(configuration: normalizedConfiguration)
+                }.value
+
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                applyRefreshPayload(payload, reconcileBackground: forceBackgroundSync)
+            } catch {
+                guard !Task.isCancelled else {
+                    return
+                }
+
+                publicationState = .failed(error.localizedDescription)
+                bridgeMessage = "Failed to save settings: \(error.localizedDescription)"
+            }
         }
     }
 
@@ -526,6 +578,36 @@ final class PrinterBridgeViewModel: ObservableObject {
         }
 
         return reason
+    }
+
+    private func applyOptimisticStatus() {
+        bridgeConfiguration.exposureMode = .proxy
+        bridgeConfiguration.normalize()
+
+        let snapshot = statusService.evaluate(configuration: bridgeConfiguration)
+        bridgeStatus = snapshot
+
+        if let selectedQueueName = bridgeConfiguration.selectedQueueName {
+            inventorySnapshot = PrinterInventoryService().snapshot(preferredQueueName: selectedQueueName)
+            jobSnapshot = PrintJobQueueService().snapshot(forQueueNamed: selectedQueueName)
+        }
+
+        if snapshot.enabledPrinterCount == 0 {
+            publicationState = .inactive
+            return
+        }
+
+        if bridgeConfiguration.keepRunningInBackground {
+            publicationState = .waiting("Updating background sharing.")
+            return
+        }
+
+        if snapshot.livePrinterCount > 0 {
+            publicationState = .advertising(summaryEndpointDescription(for: snapshot))
+        } else {
+            let reason = snapshot.selectedPrinter?.message ?? snapshot.message
+            publicationState = .waiting(reason.isEmpty ? "An enabled printer is not ready yet." : reason)
+        }
     }
 
     nonisolated private static func buildRefreshPayload(configuration: BridgeConfiguration) -> RefreshPayload {
