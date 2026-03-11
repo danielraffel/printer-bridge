@@ -111,7 +111,10 @@ fi
 
 pkgutil --check-signature "$OUTPUT_PKG"
 spctl -a -vv -t install "$OUTPUT_PKG"
-shasum -a 256 "$OUTPUT_PKG" > "$OUTPUT_SHA"
+(
+  cd "$OUTPUT_DIR"
+  shasum -a 256 "Printer-Bridge.pkg" > "Printer-Bridge.pkg.sha256"
+)
 
 echo "Created installer:"
 echo "  $OUTPUT_PKG"
