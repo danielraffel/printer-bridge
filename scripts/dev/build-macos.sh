@@ -12,6 +12,17 @@ ARM64_DAEMON="$DERIVED_DATA_ARM64/Build/Products/Release/PrinterBridgeDaemon"
 X86_64_DAEMON="$DERIVED_DATA_X86_64/Build/Products/Release/PrinterBridgeDaemon"
 OUTPUT_DAEMON="$OUTPUT_APP/Contents/Resources/PrinterBridgeDaemon"
 
+resolve_codesign_identity() {
+  if [ -n "${PRINTERBRIDGE_CODESIGN_IDENTITY:-}" ]; then
+    printf '%s\n' "$PRINTERBRIDGE_CODESIGN_IDENTITY"
+    return 0
+  fi
+
+  security find-identity -v -p codesigning 2>/dev/null \
+    | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' \
+    | head -n 1
+}
+
 "$ROOT/scripts/dev/generate-app-icon-set.sh"
 "$ROOT/scripts/dev/generate-xcode-project.sh"
 
@@ -52,6 +63,16 @@ lipo \
 
 chmod 755 "$OUTPUT_DAEMON"
 
-codesign --force --deep --sign - "$OUTPUT_APP"
+SIGNING_IDENTITY="$(resolve_codesign_identity || true)"
+if [ -n "$SIGNING_IDENTITY" ]; then
+  echo "🔏 Signing with: $SIGNING_IDENTITY"
+  codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$OUTPUT_DAEMON"
+  codesign --force --deep --sign "$SIGNING_IDENTITY" --timestamp "$OUTPUT_APP"
+else
+  echo "⚠️  No Developer ID identity found; falling back to ad hoc signing."
+  codesign --force --sign - "$OUTPUT_DAEMON"
+  codesign --force --deep --sign - "$OUTPUT_APP"
+fi
+
 file "$OUTPUT_APP/Contents/MacOS/PrinterBridge"
 file "$OUTPUT_DAEMON"
