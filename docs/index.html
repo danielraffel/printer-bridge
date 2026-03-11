@@ -1,244 +1,489 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Printer Bridge for macOS</title>
-    <meta name="description" content="Printer Bridge is a macOS utility that enables AirPrint for printers that already work with a modern Mac.">
+    <meta name="description" content="Printer Bridge helps keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Printer Bridge for macOS">
     <meta property="og:description" content="Enable AirPrint for printers that already work with a modern Mac.">
     <meta property="og:url" content="https://www.generouscorp.com/printer-bridge/">
-    <meta property="og:image" content="https://www.generouscorp.com/printer-bridge/assets/printer-bridge-icon.png">
+    <meta property="og:image" content="https://www.generouscorp.com/printer-bridge/assets/printer-bridge-og.png">
     <meta property="og:image:width" content="1024">
     <meta property="og:image:height" content="1024">
     <meta property="og:image:alt" content="Printer Bridge app icon">
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="Printer Bridge for macOS">
     <meta name="twitter:description" content="Enable AirPrint for printers that already work with a modern Mac.">
-    <meta name="twitter:image" content="https://www.generouscorp.com/printer-bridge/assets/printer-bridge-icon.png">
+    <meta name="twitter:image" content="https://www.generouscorp.com/printer-bridge/assets/printer-bridge-og.png">
     <link rel="icon" type="image/png" href="./assets/printer-bridge-icon.png">
     <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #f4f7fb;
-        --card: rgba(255, 255, 255, 0.9);
-        --card-border: rgba(98, 116, 150, 0.16);
-        --text: #18212f;
-        --muted: #5d6878;
-        --subtle: #748094;
-        --link: #1859d1;
-        --primary: #1f6feb;
-        --primary-strong: #0f5ad6;
-        --secondary-bg: rgba(24, 89, 209, 0.1);
-      }
-
-      @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #0b1120;
-          --card: rgba(15, 23, 42, 0.88);
-          --card-border: rgba(124, 147, 187, 0.14);
-          --text: #eef3fb;
-          --muted: #b2bdd0;
-          --subtle: #8d9ab2;
-          --link: #96c2ff;
-          --primary: #4c97ff;
-          --primary-strong: #6aa8ff;
-          --secondary-bg: rgba(76, 151, 255, 0.14);
+            color-scheme: light dark;
+            --bg: #f5f7fb;
+            --panel: rgba(255, 255, 255, 0.82);
+            --panel-strong: rgba(255, 255, 255, 0.9);
+            --panel-muted: rgba(255, 255, 255, 0.62);
+            --border: rgba(100, 118, 145, 0.16);
+            --text: #152033;
+            --muted: #5e6a7e;
+            --subtle: #75829a;
+            --accent: #1d6df2;
+            --accent-hover: #0f5fdd;
+            --shadow: 0 24px 60px rgba(11, 23, 43, 0.12);
+            --shadow-strong: 0 20px 48px rgba(29, 109, 242, 0.22);
         }
-      }
 
-      * {
-        box-sizing: border-box;
-      }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #07101f;
+                --panel: rgba(12, 21, 38, 0.78);
+                --panel-strong: rgba(15, 26, 47, 0.9);
+                --panel-muted: rgba(14, 24, 43, 0.66);
+                --border: rgba(127, 150, 191, 0.14);
+                --text: #f3f7ff;
+                --muted: #c2cde0;
+                --subtle: #98a7c2;
+                --accent: #5d9bff;
+                --accent-hover: #76adff;
+                --shadow: 0 32px 90px rgba(0, 0, 0, 0.34);
+                --shadow-strong: 0 24px 56px rgba(40, 117, 255, 0.28);
+            }
+        }
 
-      body {
-        margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background:
-          radial-gradient(circle at top, rgba(74, 147, 255, 0.24), transparent 38%),
-          linear-gradient(180deg, rgba(9, 16, 31, 0) 0%, rgba(9, 16, 31, 0.03) 100%),
-          var(--bg);
-        color: var(--text);
-      }
+        * {
+            box-sizing: border-box;
+        }
 
-      main {
-        max-width: 920px;
-        margin: 0 auto;
-        padding: 64px 20px 88px;
-      }
+        html {
+            scroll-behavior: smooth;
+        }
 
-      .card {
-        background: var(--card);
-        border: 1px solid var(--card-border);
-        border-radius: 32px;
-        padding: 40px;
-        box-shadow: 0 24px 72px rgba(5, 13, 27, 0.16);
-        backdrop-filter: blur(14px);
-      }
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+            background:
+                radial-gradient(circle at top, rgba(74, 147, 255, 0.28), transparent 34%),
+                linear-gradient(180deg, rgba(11, 23, 43, 0.02), rgba(11, 23, 43, 0)),
+                var(--bg);
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.5;
+        }
 
-      .hero {
-        text-align: center;
-      }
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
 
-      .hero-icon-link {
-        display: inline-block;
-        margin-bottom: 20px;
-      }
+        a:hover {
+            color: var(--accent-hover);
+        }
 
-      .hero-icon {
-        width: 104px;
-        height: 104px;
-        border-radius: 24px;
-        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2);
-      }
+        .container {
+            width: min(1120px, calc(100% - 40px));
+            margin: 0 auto;
+            padding: 56px 0 88px;
+        }
 
-      h1 {
-        margin: 0;
-        font-size: clamp(2.8rem, 7vw, 4.25rem);
-        line-height: 1.02;
-        letter-spacing: -0.04em;
-      }
+        .hero-card,
+        .section-card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 32px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
+        }
 
-      .lede {
-        max-width: 720px;
-        margin: 18px auto 0;
-        font-size: 1.18rem;
-        line-height: 1.65;
-        color: var(--muted);
-      }
+        .hero-card {
+            padding: 48px 42px 40px;
+            text-align: center;
+        }
 
-      .highlights {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-        gap: 14px;
-        margin: 30px 0 0;
-        padding: 0;
-        list-style: none;
-      }
+        .hero-icon-link {
+            display: inline-block;
+            margin-bottom: 20px;
+        }
 
-      .highlights li {
-        padding: 15px 16px;
-        border-radius: 18px;
-        background: rgba(127, 146, 179, 0.09);
-        color: var(--text);
-        text-align: left;
-      }
+        .hero-icon {
+            width: 116px;
+            height: 116px;
+            border-radius: 28px;
+            box-shadow: 0 18px 42px rgba(11, 23, 43, 0.18);
+        }
 
-      .highlight-title {
-        display: block;
-        margin-bottom: 6px;
-        font-weight: 700;
-      }
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            margin-bottom: 18px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--accent);
+            background: var(--panel-muted);
+            border: 1px solid var(--border);
+        }
 
-      .highlight-copy {
-        color: var(--muted);
-      }
+        h1 {
+            margin: 0;
+            font-size: clamp(2.8rem, 6vw, 4.7rem);
+            line-height: 0.98;
+            letter-spacing: -0.05em;
+        }
 
-      .cta {
-        margin-top: 34px;
-        text-align: center;
-      }
+        .lede {
+            width: min(720px, 100%);
+            margin: 18px auto 0;
+            font-size: clamp(1.1rem, 2.4vw, 1.45rem);
+            color: var(--muted);
+        }
 
-      .actions {
-        display: flex;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 14px;
-      }
+        .hero-actions {
+            margin-top: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
 
-      a {
-        color: var(--link);
-        text-decoration: none;
-      }
+        .button-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
 
-      .button {
-        display: inline-block;
-        padding: 13px 18px;
-        border-radius: 999px;
-        font-weight: 700;
-        transition: background-color 140ms ease, transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
-      }
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 244px;
+            padding: 14px 24px;
+            border-radius: 999px;
+            font-size: 1rem;
+            font-weight: 700;
+            transition: transform 140ms ease, box-shadow 140ms ease, background-color 140ms ease, border-color 140ms ease;
+        }
 
-      .button-primary {
-        min-width: 260px;
-        background: linear-gradient(180deg, var(--primary), var(--primary-strong));
-        color: #ffffff;
-        box-shadow: 0 16px 36px rgba(31, 111, 235, 0.28);
-      }
+        .button:focus-visible,
+        .text-link:focus-visible,
+        summary:focus-visible {
+            outline: 2px solid rgba(29, 109, 242, 0.45);
+            outline-offset: 3px;
+        }
 
-      .button-primary:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 20px 42px rgba(31, 111, 235, 0.34);
-      }
+        .button-primary {
+            color: #fff;
+            background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+            box-shadow: var(--shadow-strong);
+        }
 
-      .button-primary:active {
-        transform: translateY(0);
-        box-shadow: inset 0 1px 4px rgba(12, 22, 40, 0.24);
-      }
+        .button-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 24px 56px rgba(29, 109, 242, 0.26);
+        }
 
-      .button:focus-visible,
-      .footer-link:focus-visible {
-        outline: 2px solid rgba(31, 111, 235, 0.45);
-        outline-offset: 3px;
-      }
+        .button-primary:active {
+            transform: translateY(0);
+            box-shadow: inset 0 1px 4px rgba(10, 18, 33, 0.26);
+        }
 
-      .footer-links {
-        display: flex;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 16px;
-        margin-top: 22px;
-      }
+        .button-secondary {
+            min-width: auto;
+            padding-inline: 18px;
+            color: var(--text);
+            background: var(--panel-strong);
+            border: 1px solid var(--border);
+        }
 
-      .footer-link {
-        color: var(--subtle);
-        font-size: 0.95rem;
-      }
+        .button-secondary:hover {
+            transform: translateY(-1px);
+        }
 
-      .cta-meta {
-        margin: 12px 0 0;
-        color: var(--subtle);
-        font-size: 0.9rem;
-      }
+        .button-note {
+            font-size: 0.95rem;
+            color: var(--subtle);
+        }
+
+        .section {
+            margin-top: 28px;
+        }
+
+        .section-card {
+            padding: 30px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: end;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+
+        .section-title {
+            margin: 0;
+            font-size: clamp(1.55rem, 2.6vw, 2rem);
+            letter-spacing: -0.03em;
+        }
+
+        .section-copy {
+            margin: 6px 0 0;
+            color: var(--muted);
+            max-width: 640px;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .gallery-card {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 14px;
+            border-radius: 24px;
+            background: var(--panel-muted);
+            border: 1px solid var(--border);
+        }
+
+        .gallery-card img {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            box-shadow: 0 16px 34px rgba(7, 16, 31, 0.18);
+        }
+
+        .gallery-caption {
+            font-size: 0.93rem;
+            color: var(--muted);
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .feature {
+            padding: 24px;
+            border-radius: 24px;
+            background: var(--panel-muted);
+            border: 1px solid var(--border);
+        }
+
+        .feature h3 {
+            margin: 0 0 10px;
+            font-size: 1.08rem;
+            letter-spacing: -0.02em;
+        }
+
+        .feature p {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .faq {
+            display: grid;
+            gap: 12px;
+        }
+
+        details {
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--panel-muted);
+            overflow: hidden;
+        }
+
+        summary {
+            cursor: pointer;
+            list-style: none;
+            padding: 20px 22px;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .faq-body {
+            padding: 0 22px 22px;
+            color: var(--muted);
+        }
+
+        .faq-body p {
+            margin: 0;
+        }
+
+        .footer {
+            margin-top: 28px;
+            padding: 0 4px;
+            text-align: center;
+            color: var(--subtle);
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-top: 14px;
+        }
+
+        .text-link {
+            color: var(--subtle);
+        }
+
+        @media (max-width: 940px) {
+            .gallery,
+            .features {
+                grid-template-columns: 1fr;
+            }
+
+            .container {
+                width: min(100% - 28px, 1120px);
+                padding-top: 28px;
+            }
+
+            .hero-card,
+            .section-card {
+                border-radius: 24px;
+            }
+
+            .hero-card {
+                padding: 36px 22px 28px;
+            }
+
+            .section-card {
+                padding: 22px;
+            }
+        }
     </style>
-  </head>
-  <body>
-    <main>
-      <section class="card">
-        <div class="hero">
-          <a class="hero-icon-link" href="./assets/printer-bridge-icon.png">
-            <img class="hero-icon" src="./assets/printer-bridge-icon.png" alt="Printer Bridge app icon">
-          </a>
-          <h1>Printer Bridge</h1>
-          <p class="lede">Keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.</p>
-        </div>
-        <ul class="highlights">
-          <li>
-            <span class="highlight-title">Works with printers your Mac already uses.</span>
-            <span class="highlight-copy">If macOS can already print to it, Printer Bridge will usually make it available to iPhone, iPad, and other Apple devices.</span>
-          </li>
-          <li>
-            <span class="highlight-title">Built for modern macOS.</span>
-            <span class="highlight-copy">Universal installer for Intel and Apple Silicon on macOS 15 or later.</span>
-          </li>
-          <li>
-            <span class="highlight-title">Private by design.</span>
-            <span class="highlight-copy">No analytics, no tracking, no ad network, and no data resale.</span>
-          </li>
-        </ul>
-        <div class="cta">
-          <div class="actions">
-            <a class="button button-primary" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg">Download Universal macOS Installer</a>
-          </div>
-          <p class="cta-meta">For Apple Silicon and Intel Macs.</p>
-          <div class="footer-links">
-            <a class="footer-link" href="./legal/privacy.html">Privacy Policy</a>
-            <a class="footer-link" href="./legal/terms.html">Terms</a>
-            <a class="footer-link" href="https://github.com/danielraffel/printer-bridge">Source on GitHub</a>
-          </div>
-        </div>
-      </section>
-    </main>
-  </body>
+</head>
+<body>
+    <div class="container">
+        <section class="hero-card">
+            <a class="hero-icon-link" href="./assets/printer-bridge-icon.png">
+                <img class="hero-icon" src="./assets/printer-bridge-icon.png" alt="Printer Bridge app icon">
+            </a>
+            <div class="eyebrow">macOS App</div>
+            <h1>Printer Bridge</h1>
+            <p class="lede">Printer Bridge helps keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.</p>
+            <div class="hero-actions">
+                <div class="button-row">
+                    <a class="button button-primary" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.dmg">Download for macOS</a>
+                    <a class="button button-secondary" href="https://github.com/danielraffel/printer-bridge">View Source</a>
+                </div>
+                <div class="button-note">Includes installer and uninstaller. For Apple Silicon and Intel Macs on macOS 15 or later.</div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-card">
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">See it in action</h2>
+                        <p class="section-copy">A simple macOS utility for enabling AirPrint, checking print jobs, and keeping legacy printers useful without sending anything to a cloud service.</p>
+                    </div>
+                </div>
+                <div class="gallery">
+                    <figure class="gallery-card">
+                        <img src="./assets/gallery/printers-light.png" alt="Printer Bridge printers view in light mode">
+                        <figcaption class="gallery-caption">A focused printer view with quick AirPrint controls.</figcaption>
+                    </figure>
+                    <figure class="gallery-card">
+                        <img src="./assets/gallery/printers-dark-jobs.png" alt="Printer Bridge jobs view in dark mode">
+                        <figcaption class="gallery-caption">Check recent print jobs and queue activity from the same app.</figcaption>
+                    </figure>
+                    <figure class="gallery-card">
+                        <img src="./assets/gallery/printers-daemon.png" alt="Printer Bridge background sharing status">
+                        <figcaption class="gallery-caption">Background sharing keeps AirPrint available even after setup is done.</figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-card">
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">Why use Printer Bridge</h2>
+                        <p class="section-copy">If your Mac can already print to a printer but that printer does not support AirPrint, Printer Bridge will usually make it available to iPhone, iPad, and other Apple devices on your local network.</p>
+                    </div>
+                </div>
+                <div class="features">
+                    <div class="feature">
+                        <h3>Built on what already works</h3>
+                        <p>Printer Bridge uses the printer queue macOS already knows how to print to, instead of requiring a new driver stack.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>Runs locally on your Mac</h3>
+                        <p>A small background service advertises the printer over AirPrint and forwards jobs into the existing macOS and CUPS queue.</p>
+                    </div>
+                    <div class="feature">
+                        <h3>Private by default</h3>
+                        <p>No analytics, no tracking, no ad network, and no data resale. Printer Bridge is designed to stay local to your network.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-card">
+                <div class="section-header">
+                    <div>
+                        <h2 class="section-title">Questions</h2>
+                        <p class="section-copy">The short version: if the printer already works from this Mac, Printer Bridge is the missing AirPrint layer.</p>
+                    </div>
+                </div>
+                <div class="faq">
+                    <details>
+                        <summary>How does this actually work?</summary>
+                        <div class="faq-body">
+                            <p>Printer Bridge runs a local background service on your Mac, advertises an AirPrint-capable printer on your network, and forwards those jobs into the printer queue macOS already uses. If your Mac can already print to the printer, Printer Bridge usually handles the rest.</p>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Do I need to leave my Mac on?</summary>
+                        <div class="faq-body">
+                            <p>Yes. Your Mac is the bridge, so it needs to stay awake and connected to your local network for AirPrint discovery and printing to keep working.</p>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>Do I need to enable macOS Printer Sharing?</summary>
+                        <div class="faq-body">
+                            <p>Not normally. Current builds use Printer Bridge’s own proxy service rather than depending on the older macOS Printer Sharing path, but the printer still needs to print successfully from this Mac first.</p>
+                        </div>
+                    </details>
+                    <details>
+                        <summary>How can I contribute?</summary>
+                        <div class="faq-body">
+                            <p><a href="https://github.com/danielraffel/printer-bridge">The project is open source on GitHub</a>. You can file issues, open pull requests, or use it as a base for keeping more working hardware out of unnecessary e-waste.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <footer class="footer">
+            <div>Created by Generous Corp. and Daniel Raffel.</div>
+            <div class="footer-links">
+                <a class="text-link" href="./legal/privacy.html">Privacy Policy</a>
+                <a class="text-link" href="./legal/terms.html">Terms</a>
+                <a class="text-link" href="https://github.com/danielraffel/printer-bridge">GitHub</a>
+            </div>
+        </footer>
+    </div>
+</body>
 </html>
