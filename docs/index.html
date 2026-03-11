@@ -21,42 +21,60 @@
     <style>
       :root {
         color-scheme: light dark;
-        --bg: #f3f5f8;
-        --card: rgba(255, 255, 255, 0.88);
+        --bg: #f4f7fb;
+        --card: rgba(255, 255, 255, 0.9);
+        --card-border: rgba(98, 116, 150, 0.16);
         --text: #18212f;
-        --muted: #566173;
-        --link: #1f6feb;
+        --muted: #5d6878;
+        --subtle: #748094;
+        --link: #1859d1;
+        --primary: #1f6feb;
+        --primary-strong: #0f5ad6;
+        --secondary-bg: rgba(24, 89, 209, 0.1);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
-          --bg: #0f1623;
-          --card: rgba(20, 28, 43, 0.92);
+          --bg: #0b1120;
+          --card: rgba(15, 23, 42, 0.88);
+          --card-border: rgba(124, 147, 187, 0.14);
           --text: #eef3fb;
-          --muted: #a9b4c4;
-          --link: #7db3ff;
+          --muted: #b2bdd0;
+          --subtle: #8d9ab2;
+          --link: #96c2ff;
+          --primary: #4c97ff;
+          --primary-strong: #6aa8ff;
+          --secondary-bg: rgba(76, 151, 255, 0.14);
         }
+      }
+
+      * {
+        box-sizing: border-box;
       }
 
       body {
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top, rgba(74, 147, 255, 0.18), transparent 38%), var(--bg);
+        background:
+          radial-gradient(circle at top, rgba(74, 147, 255, 0.24), transparent 38%),
+          linear-gradient(180deg, rgba(9, 16, 31, 0) 0%, rgba(9, 16, 31, 0.03) 100%),
+          var(--bg);
         color: var(--text);
       }
 
       main {
-        max-width: 760px;
+        max-width: 920px;
         margin: 0 auto;
-        padding: 56px 20px;
+        padding: 64px 20px 88px;
       }
 
       .card {
         background: var(--card);
-        border-radius: 24px;
-        padding: 32px;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
-        backdrop-filter: blur(12px);
+        border: 1px solid var(--card-border);
+        border-radius: 32px;
+        padding: 40px;
+        box-shadow: 0 24px 72px rgba(5, 13, 27, 0.16);
+        backdrop-filter: blur(14px);
       }
 
       .hero {
@@ -65,36 +83,67 @@
 
       .hero-icon-link {
         display: inline-block;
-        margin-bottom: 16px;
+        margin-bottom: 20px;
       }
 
       .hero-icon {
-        width: 112px;
-        height: 112px;
+        width: 104px;
+        height: 104px;
         border-radius: 24px;
-        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+        box-shadow: 0 18px 48px rgba(15, 23, 42, 0.2);
       }
 
       h1 {
-        margin: 0 0 8px;
-        font-size: 2.25rem;
+        margin: 0;
+        font-size: clamp(2.8rem, 7vw, 4.25rem);
+        line-height: 1.02;
+        letter-spacing: -0.04em;
       }
 
-      p {
+      .lede {
+        max-width: 720px;
+        margin: 18px auto 0;
+        font-size: 1.18rem;
+        line-height: 1.65;
         color: var(--muted);
-        line-height: 1.6;
       }
 
-      ul {
-        padding-left: 20px;
+      .highlights {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 14px;
+        margin: 30px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .highlights li {
+        padding: 15px 16px;
+        border-radius: 18px;
+        background: rgba(127, 146, 179, 0.09);
+        color: var(--text);
+        text-align: left;
+      }
+
+      .highlight-title {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 700;
+      }
+
+      .highlight-copy {
         color: var(--muted);
       }
 
-      .links {
+      .cta {
+        margin-top: 34px;
+      }
+
+      .actions {
         display: flex;
-        gap: 12px;
+        justify-content: center;
         flex-wrap: wrap;
-        margin-top: 28px;
+        gap: 14px;
       }
 
       a {
@@ -104,28 +153,52 @@
 
       .button {
         display: inline-block;
-        padding: 12px 16px;
+        padding: 13px 18px;
         border-radius: 999px;
-        background: rgba(31, 111, 235, 0.12);
-        font-weight: 600;
-        transition: background-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+        font-weight: 700;
+        transition: background-color 140ms ease, transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
       }
 
-      .button:hover {
-        background: rgba(31, 111, 235, 0.2);
+      .button-primary {
+        min-width: 260px;
+        background: linear-gradient(180deg, var(--primary), var(--primary-strong));
+        color: #ffffff;
+        box-shadow: 0 16px 36px rgba(31, 111, 235, 0.28);
+      }
+
+      .button-primary:hover {
         transform: translateY(-1px);
-        box-shadow: 0 10px 24px rgba(31, 111, 235, 0.14);
+        box-shadow: 0 20px 42px rgba(31, 111, 235, 0.34);
       }
 
-      .button:active {
-        background: rgba(31, 111, 235, 0.28);
+      .button-primary:active {
         transform: translateY(0);
-        box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.18);
+        box-shadow: inset 0 1px 4px rgba(12, 22, 40, 0.24);
       }
 
-      .button:focus-visible {
+      .button:focus-visible,
+      .footer-link:focus-visible {
         outline: 2px solid rgba(31, 111, 235, 0.45);
         outline-offset: 3px;
+      }
+
+      .footer-links {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-top: 14px;
+      }
+
+      .footer-link {
+        color: var(--subtle);
+        font-size: 0.95rem;
+      }
+
+      .cta-meta {
+        margin: 12px 0 0;
+        color: var(--subtle);
+        font-size: 0.96rem;
       }
     </style>
   </head>
@@ -137,19 +210,32 @@
             <img class="hero-icon" src="./assets/printer-bridge-icon.png" alt="Printer Bridge app icon">
           </a>
           <h1>Printer Bridge</h1>
-          <p>Printer Bridge is a macOS utility that helps keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.</p>
+          <p class="lede">Keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.</p>
         </div>
-        <ul>
-          <li>If your Mac can already print to it but it does not support AirPrint, Printer Bridge will usually make it available to iPhone, iPad, and other Apple devices.</li>
-          <li>Universal macOS installer for Intel and Apple Silicon</li>
-          <li>Requires macOS 15 or later</li>
-          <li>No analytics, no tracking, no ad network, and no data resale</li>
+        <ul class="highlights">
+          <li>
+            <span class="highlight-title">Works with printers your Mac already uses.</span>
+            <span class="highlight-copy">If macOS can already print to it, Printer Bridge will usually make it available to iPhone, iPad, and other Apple devices.</span>
+          </li>
+          <li>
+            <span class="highlight-title">Built for modern macOS.</span>
+            <span class="highlight-copy">Universal installer for Intel and Apple Silicon on macOS 15 or later.</span>
+          </li>
+          <li>
+            <span class="highlight-title">Private by design.</span>
+            <span class="highlight-copy">No analytics, no tracking, no ad network, and no data resale.</span>
+          </li>
         </ul>
-        <div class="links">
-          <a class="button" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg">Download Universal macOS Installer</a>
-          <a class="button" href="./legal/privacy.html">Privacy Policy</a>
-          <a class="button" href="./legal/terms.html">Terms</a>
-          <a class="button" href="https://github.com/danielraffel/printer-bridge">Source on GitHub</a>
+        <div class="cta">
+          <div class="actions">
+            <a class="button button-primary" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg">Download Universal macOS Installer</a>
+          </div>
+          <p class="cta-meta">For Apple Silicon and Intel Macs.</p>
+          <div class="footer-links">
+            <a class="footer-link" href="./legal/privacy.html">Privacy Policy</a>
+            <a class="footer-link" href="./legal/terms.html">Terms</a>
+            <a class="footer-link" href="https://github.com/danielraffel/printer-bridge">Source on GitHub</a>
+          </div>
         </div>
       </section>
     </main>
