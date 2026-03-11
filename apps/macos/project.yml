@@ -12,6 +12,7 @@ settings:
       ONLY_ACTIVE_ARCH: YES
     Release:
       ONLY_ACTIVE_ARCH: NO
+      ENABLE_HARDENED_RUNTIME: YES
 packages:
   PrinterBridgeCore:
     path: ../../packages/core

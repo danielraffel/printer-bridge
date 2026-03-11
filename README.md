@@ -2,6 +2,10 @@
 
 Printer Bridge is a macOS-first AirPrint bridge for legacy printers that already work through CUPS but do not natively appear as AirPrint printers to Apple devices.
 
+Download the latest signed installer:
+- [Printer-Bridge.pkg](https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg)
+- [All Releases](https://github.com/danielraffel/printer-bridge/releases)
+
 The initial target is a Brother HL-2170W environment verified through:
 - development on an Apple Silicon MacBook Pro running macOS 26.x
 - deployment and validation on an Intel Mac mini running macOS 15.7.4

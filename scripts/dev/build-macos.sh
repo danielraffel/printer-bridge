@@ -70,8 +70,8 @@ chmod 755 "$OUTPUT_DAEMON"
 SIGNING_IDENTITY="$(resolve_codesign_identity || true)"
 if [ -n "$SIGNING_IDENTITY" ]; then
   echo "🔏 Signing with: $SIGNING_IDENTITY"
-  codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$OUTPUT_DAEMON"
-  codesign --force --deep --sign "$SIGNING_IDENTITY" --timestamp "$OUTPUT_APP"
+  codesign --force --options runtime --sign "$SIGNING_IDENTITY" --timestamp "$OUTPUT_DAEMON"
+  codesign --force --deep --options runtime --sign "$SIGNING_IDENTITY" --timestamp "$OUTPUT_APP"
 else
   echo "⚠️  No Developer ID identity found; falling back to ad hoc signing."
   codesign --force --sign - "$OUTPUT_DAEMON"
