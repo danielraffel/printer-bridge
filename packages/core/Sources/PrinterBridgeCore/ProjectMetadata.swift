@@ -6,6 +6,7 @@ public enum ProjectMetadata {
     public static let minimumSupportedMacOS = "15.0"
     public static let verificationHostAlias = "macmini"
     public static let primaryTargetPrinter = "Brother_HL_2170W_series"
+    public static let defaultProxyPort = 8631
     public static let developmentHostDescription = "Apple Silicon MacBook Pro running macOS 26.x"
     public static let verificationHostDescription = "Intel Mac mini running macOS 15.7.4"
 }

@@ -89,6 +89,7 @@ public enum SystemTool: CaseIterable {
     case swVers
     case uname
     case lpstat
+    case lp
     case lpoptions
     case ipptool
     case ippfind
@@ -103,6 +104,8 @@ public enum SystemTool: CaseIterable {
             return "/usr/bin/uname"
         case .lpstat:
             return "/usr/bin/lpstat"
+        case .lp:
+            return "/usr/bin/lp"
         case .lpoptions:
             return "/usr/bin/lpoptions"
         case .ipptool:
@@ -118,7 +121,7 @@ public enum SystemTool: CaseIterable {
 
     public var isRequired: Bool {
         switch self {
-        case .swVers, .uname, .lpstat, .lpoptions, .ipptool, .ippfind:
+        case .swVers, .uname, .lpstat, .lp, .lpoptions, .ipptool, .ippfind:
             return true
         case .dnsSD, .cancel:
             return false

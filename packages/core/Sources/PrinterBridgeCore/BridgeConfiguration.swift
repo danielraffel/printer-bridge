@@ -2,6 +2,7 @@ import Foundation
 
 public enum BridgeExposureMode: String, Codable, Equatable, Sendable {
     case directCUPS = "direct-cups"
+    case proxy = "proxy"
 }
 
 public struct BridgeConfiguration: Codable, Equatable, Sendable {
@@ -14,7 +15,7 @@ public struct BridgeConfiguration: Codable, Equatable, Sendable {
         isEnabled: Bool = false,
         selectedQueueName: String? = ProjectMetadata.primaryTargetPrinter,
         advertisedNameOverride: String? = nil,
-        exposureMode: BridgeExposureMode = .directCUPS
+        exposureMode: BridgeExposureMode = .proxy
     ) {
         self.isEnabled = isEnabled
         self.selectedQueueName = selectedQueueName

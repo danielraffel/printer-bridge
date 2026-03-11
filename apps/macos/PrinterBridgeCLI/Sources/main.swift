@@ -36,6 +36,7 @@ enum PrinterBridgeCLI {
         let inventory = PrinterInventoryService()
         let attributeService = IPPPrinterAttributeService()
         let configurationStore = BridgeConfigurationStore()
+        let runtimeService = BridgeRuntimeService()
         let statusService = BridgeStatusService(
             inventoryService: inventory,
             attributeService: attributeService
@@ -81,7 +82,7 @@ enum PrinterBridgeCLI {
                     exit(1)
                 }
 
-                try runAdvertisement(advertisement, duration: options.duration)
+                try runAdvertisement(advertisement, duration: options.duration, runtimeService: runtimeService)
             } catch {
                 fputs("Failed to advertise bridge service: \(error)\n", stderr)
                 exit(1)
@@ -121,7 +122,7 @@ enum PrinterBridgeCLI {
                 print("- printer URI: \(advertisement.printerURI)")
                 print("- port: \(advertisement.port)")
                 print("- warning: \(advertisement.warnings.joined(separator: " "))")
-                try runAdvertisement(advertisement, duration: options.duration)
+                try runAdvertisement(advertisement, duration: options.duration, runtimeService: runtimeService)
             } catch {
                 fputs("Failed to advertise synthetic service: \(error)\n", stderr)
                 exit(1)
@@ -132,6 +133,7 @@ enum PrinterBridgeCLI {
                 let printerName = arguments.dropFirst().first ?? configuration.selectedQueueName ?? ProjectMetadata.primaryTargetPrinter
                 configuration.selectedQueueName = printerName
                 configuration.isEnabled = true
+                configuration.exposureMode = .proxy
                 try configurationStore.save(configuration)
                 print(statusService.renderStatus(configuration: configuration))
             } catch {
@@ -306,16 +308,20 @@ enum PrinterBridgeCLI {
             .filter { !$0.isEmpty }
 
         for line in lines {
-            print("[dns-sd] \(line)")
+            if line.hasPrefix("[proxy]") {
+                print(line)
+            } else {
+                print("[dns-sd] \(line)")
+            }
         }
     }
 
     static func runAdvertisement(
         _ advertisement: AirPrintAdvertisementPlan,
-        duration: TimeInterval
+        duration: TimeInterval,
+        runtimeService: BridgeRuntimeService
     ) throws {
-        let publisher = BonjourAdvertisementService()
-        let session = try publisher.publish(advertisement) { chunk in
+        let session = try runtimeService.start(advertisementPlan: advertisement) { chunk in
             renderPublisherOutput(chunk)
         }
         defer {
@@ -343,7 +349,7 @@ enum PrinterBridgeCLI {
         }
 
         let terminationStatus = session.stop()
-        print("Stopped Bonjour publication (dns-sd exit code \(terminationStatus)).")
+        print("Stopped bridge runtime (dns-sd exit code \(terminationStatus)).")
     }
 }
 

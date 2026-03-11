@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)"
-SOURCE_IMAGE="${1:-$ROOT/assets/branding/printerbridge-app-icon-master.png}"
+SOURCE_IMAGE="${1:-$ROOT/assets/branding/printerbridge-airprint-app-icon-master.png}"
 APP_ICON_SET_DIR="$ROOT/apps/macos/PrinterBridgeApp/Resources/Assets.xcassets/AppIcon.appiconset"
 
 if [ ! -f "$SOURCE_IMAGE" ]; then

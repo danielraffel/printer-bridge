@@ -59,23 +59,23 @@ final class PrinterBridgeViewModel: ObservableObject {
     private let configurationStore: BridgeConfigurationStore
     private let inventoryService: PrinterInventoryService
     private let statusService: BridgeStatusService
-    private let publisher: BonjourAdvertisementService
+    private let runtimeService: BridgeRuntimeService
     private let jobQueueService: PrintJobQueueService
 
-    private var activeSession: BonjourAdvertisementSession?
+    private var activeSession: BridgeRuntimeSession?
     private var activeAdvertisement: AirPrintAdvertisementPlan?
 
     init(
         configurationStore: BridgeConfigurationStore = BridgeConfigurationStore(),
         inventoryService: PrinterInventoryService = PrinterInventoryService(),
         statusService: BridgeStatusService = BridgeStatusService(),
-        publisher: BonjourAdvertisementService = BonjourAdvertisementService(),
+        runtimeService: BridgeRuntimeService = BridgeRuntimeService(),
         jobQueueService: PrintJobQueueService = PrintJobQueueService()
     ) {
         self.configurationStore = configurationStore
         self.inventoryService = inventoryService
         self.statusService = statusService
-        self.publisher = publisher
+        self.runtimeService = runtimeService
         self.jobQueueService = jobQueueService
     }
 
@@ -129,6 +129,7 @@ final class PrinterBridgeViewModel: ObservableObject {
     func loadBridgeState() {
         do {
             bridgeConfiguration = try configurationStore.load()
+            migrateToProxyIfNeeded()
             advertisedNameDraft = bridgeConfiguration.advertisedNameOverride ?? ""
             refreshState(message: nil, jobsMessage: nil)
         } catch {
@@ -192,6 +193,7 @@ final class PrinterBridgeViewModel: ObservableObject {
 
     private func persistConfiguration(message: String) {
         do {
+            bridgeConfiguration.exposureMode = .proxy
             try configurationStore.save(bridgeConfiguration)
             refreshState(message: message, jobsMessage: nil)
         } catch {
@@ -241,7 +243,7 @@ final class PrinterBridgeViewModel: ObservableObject {
         stopActivePublication()
 
         do {
-            let session = try publisher.publish(advertisement) { [weak self] chunk in
+            let session = try runtimeService.start(advertisementPlan: advertisement) { [weak self] chunk in
                 Task { @MainActor [weak self] in
                     self?.recordBonjourEvent(from: chunk)
                 }
@@ -285,5 +287,14 @@ final class PrinterBridgeViewModel: ObservableObject {
         }
 
         return reason
+    }
+
+    private func migrateToProxyIfNeeded() {
+        guard bridgeConfiguration.exposureMode != .proxy else {
+            return
+        }
+
+        bridgeConfiguration.exposureMode = .proxy
+        try? configurationStore.save(bridgeConfiguration)
     }
 }

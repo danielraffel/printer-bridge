@@ -244,7 +244,8 @@ public struct BridgeStatusService {
         let encodedQueueName = inspection.summary.name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? inspection.summary.name
         let resourcePath = "/printers/\(encodedQueueName)"
-        let printerURI = "ipp://\(hostName):631\(resourcePath)"
+        let port = advertisedPort(for: configuration.exposureMode)
+        let printerURI = "ipp://\(hostName):\(port)\(resourcePath)"
         let txtRecords = makeTXTRecords(
             serviceName: serviceName,
             hostName: hostName,
@@ -255,13 +256,14 @@ public struct BridgeStatusService {
         let warnings = makeWarnings(
             inspection: inspection,
             attributes: attributes,
-            txtRecords: txtRecords
+            txtRecords: txtRecords,
+            exposureMode: configuration.exposureMode
         )
 
         return AirPrintAdvertisementPlan(
             serviceName: serviceName,
             hostName: hostName,
-            port: 631,
+            port: port,
             resourcePath: resourcePath,
             printerURI: printerURI,
             backingQueueName: inspection.summary.name,
@@ -269,6 +271,15 @@ public struct BridgeStatusService {
             txtRecords: txtRecords,
             warnings: warnings
         )
+    }
+
+    private func advertisedPort(for exposureMode: BridgeExposureMode) -> Int {
+        switch exposureMode {
+        case .directCUPS:
+            return 631
+        case .proxy:
+            return ProjectMetadata.defaultProxyPort
+        }
     }
 
     private func makeTXTRecords(
@@ -374,7 +385,8 @@ public struct BridgeStatusService {
     private func makeWarnings(
         inspection: PrinterQueueInspection,
         attributes: IPPPrinterAttributesSnapshot?,
-        txtRecords: [AirPrintAdvertisementPlan.TXTRecord]
+        txtRecords: [AirPrintAdvertisementPlan.TXTRecord],
+        exposureMode: BridgeExposureMode
     ) -> [String] {
         var warnings: [String] = []
 
@@ -383,7 +395,7 @@ public struct BridgeStatusService {
             return warnings
         }
 
-        if attributes.boolValue(named: "printer-is-shared") == false {
+        if exposureMode == .directCUPS, attributes.boolValue(named: "printer-is-shared") == false {
             warnings.append("The selected CUPS queue is not shared yet. Direct CUPS exposure will not work until host sharing or proxying is enabled.")
         }
 
@@ -397,7 +409,7 @@ public struct BridgeStatusService {
             warnings.append("The queue supports AirPrint formats, but a URF capability string could not be derived yet.")
         }
 
-        if attributes.stringValue(named: "printer-uri-supported") == nil {
+        if exposureMode == .directCUPS, attributes.stringValue(named: "printer-uri-supported") == nil {
             warnings.append("The queue did not report printer-uri-supported in its IPP attributes.")
         }
 
