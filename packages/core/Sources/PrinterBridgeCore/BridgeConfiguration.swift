@@ -12,6 +12,14 @@ public struct BridgeConfiguration: Codable, Equatable, Sendable {
     public var exposureMode: BridgeExposureMode
     public var keepRunningInBackground: Bool
 
+    enum CodingKeys: String, CodingKey {
+        case isEnabled
+        case selectedQueueName
+        case advertisedNameOverride
+        case exposureMode
+        case keepRunningInBackground
+    }
+
     public init(
         isEnabled: Bool = false,
         selectedQueueName: String? = ProjectMetadata.primaryTargetPrinter,
@@ -24,6 +32,16 @@ public struct BridgeConfiguration: Codable, Equatable, Sendable {
         self.advertisedNameOverride = advertisedNameOverride
         self.exposureMode = exposureMode
         self.keepRunningInBackground = keepRunningInBackground
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? false
+        selectedQueueName = try container.decodeIfPresent(String.self, forKey: .selectedQueueName)
+        advertisedNameOverride = try container.decodeIfPresent(String.self, forKey: .advertisedNameOverride)
+        exposureMode = try container.decodeIfPresent(BridgeExposureMode.self, forKey: .exposureMode) ?? .proxy
+        keepRunningInBackground = try container.decodeIfPresent(Bool.self, forKey: .keepRunningInBackground) ?? true
     }
 }
 

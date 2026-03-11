@@ -31,3 +31,28 @@ func configurationStoreSupportsEnvironmentOverride() {
 
     #expect(store.configURL.path == "/tmp/printerbridge-test-config.json")
 }
+
+@Test
+func configurationStoreLoadsLegacyConfigurationWithoutBackgroundFlag() throws {
+    let temporaryDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: temporaryDirectory, withIntermediateDirectories: true)
+
+    let configURL = temporaryDirectory.appendingPathComponent("bridge-config.json", isDirectory: false)
+    let legacyJSON = """
+    {
+      "exposureMode" : "direct-cups",
+      "isEnabled" : false,
+      "selectedQueueName" : "Brother_HL_2170W_series"
+    }
+    """
+    let legacyData = try #require(legacyJSON.data(using: .utf8))
+    try legacyData.write(to: configURL)
+
+    let store = BridgeConfigurationStore(configURL: configURL)
+    let loaded = try store.load()
+
+    #expect(loaded.exposureMode == .directCUPS)
+    #expect(loaded.keepRunningInBackground == true)
+    #expect(loaded.selectedQueueName == "Brother_HL_2170W_series")
+}
