@@ -411,7 +411,14 @@ final class PrinterBridgeViewModel: ObservableObject {
             stopActivePublication()
 
             if reconcileBackground {
-                publicationState = .waiting("Starting background service.")
+                if bridgeStatus.enabledPrinterCount == 0 {
+                    publicationState = .inactive
+                } else if bridgeStatus.livePrinterCount > 0 {
+                    publicationState = .advertising(summaryEndpointDescription(for: bridgeStatus))
+                } else {
+                    let reason = bridgeStatus.selectedPrinter?.message ?? bridgeStatus.message
+                    publicationState = .waiting(reason.isEmpty ? "An enabled printer is not ready yet." : reason)
+                }
                 scheduleBackgroundAgentReconcile(using: bridgeStatus)
                 return
             }
@@ -448,7 +455,11 @@ final class PrinterBridgeViewModel: ObservableObject {
         case .running, .loaded:
             publicationState = .advertising(summaryEndpointDescription(for: bridgeStatus))
         case .stopped:
-            publicationState = .waiting("The background service is starting.")
+            if bridgeStatus.livePrinterCount > 0 {
+                publicationState = .advertising(summaryEndpointDescription(for: bridgeStatus))
+            } else {
+                publicationState = .waiting("The background service is starting.")
+            }
         case let .failed(reason):
             publicationState = .failed(reason)
         }
@@ -587,27 +598,18 @@ final class PrinterBridgeViewModel: ObservableObject {
         let snapshot = statusService.evaluate(configuration: bridgeConfiguration)
         bridgeStatus = snapshot
 
-        if let selectedQueueName = bridgeConfiguration.selectedQueueName {
-            inventorySnapshot = PrinterInventoryService().snapshot(preferredQueueName: selectedQueueName)
-            jobSnapshot = PrintJobQueueService().snapshot(forQueueNamed: selectedQueueName)
-        }
-
         if snapshot.enabledPrinterCount == 0 {
             publicationState = .inactive
             return
         }
 
-        if bridgeConfiguration.keepRunningInBackground {
-            publicationState = .waiting("Updating background sharing.")
+        if snapshot.livePrinterCount > 0 {
+            publicationState = .advertising(summaryEndpointDescription(for: snapshot))
             return
         }
 
-        if snapshot.livePrinterCount > 0 {
-            publicationState = .advertising(summaryEndpointDescription(for: snapshot))
-        } else {
-            let reason = snapshot.selectedPrinter?.message ?? snapshot.message
-            publicationState = .waiting(reason.isEmpty ? "An enabled printer is not ready yet." : reason)
-        }
+        let reason = snapshot.selectedPrinter?.message ?? snapshot.message
+        publicationState = .waiting(reason.isEmpty ? "An enabled printer is not ready yet." : reason)
     }
 
     nonisolated private static func buildRefreshPayload(configuration: BridgeConfiguration) -> RefreshPayload {
