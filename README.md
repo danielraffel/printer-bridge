@@ -1,5 +1,7 @@
 # Printer Bridge
 
+[Learn More](https://www.generouscorp.com/printer-bridge/)
+
 Printer Bridge is a macOS-first AirPrint bridge for legacy printers that already work through CUPS but do not natively appear as AirPrint printers to Apple devices.
 
 Download the latest signed universal macOS installer:
