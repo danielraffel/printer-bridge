@@ -2,7 +2,8 @@
 
 Printer Bridge is a macOS-first AirPrint bridge for legacy printers that already work through CUPS but do not natively appear as AirPrint printers to Apple devices.
 
-Download the latest signed installer:
+Download the latest signed universal macOS installer:
+- supports Intel and Apple Silicon Macs
 - [Printer-Bridge.pkg](https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg)
 - [All Releases](https://github.com/danielraffel/printer-bridge/releases)
 
@@ -112,13 +113,13 @@ Build the macOS targets:
 That emits a universal Release app bundle at:
 
 ```sh
-.build/dist/PrinterBridge.app
+.build/dist/Printer Bridge.app
 ```
 
 The Release bundle now also contains the headless daemon at:
 
 ```sh
-.build/dist/PrinterBridge.app/Contents/Resources/PrinterBridgeDaemon
+.build/dist/Printer Bridge.app/Contents/Resources/Printer Bridge Daemon
 ```
 
 Run the shared core tests:
@@ -187,5 +188,5 @@ Deploy the universal app bundle to the Mac mini:
 By default that installs the app to:
 
 ```sh
-/Applications/PrinterBridge.app
+/Applications/Printer Bridge.app
 ```

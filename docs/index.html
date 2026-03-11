@@ -3,7 +3,21 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Printer Bridge</title>
+    <title>Printer Bridge for macOS</title>
+    <meta name="description" content="Printer Bridge is a macOS utility that enables AirPrint for printers that already work with a modern Mac.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Printer Bridge for macOS">
+    <meta property="og:description" content="Enable AirPrint for printers that already work with a modern Mac.">
+    <meta property="og:url" content="https://www.generouscorp.com/printer-bridge/">
+    <meta property="og:image" content="https://www.generouscorp.com/printer-bridge/assets/printer-bridge-icon.png">
+    <meta property="og:image:width" content="1024">
+    <meta property="og:image:height" content="1024">
+    <meta property="og:image:alt" content="Printer Bridge app icon">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Printer Bridge for macOS">
+    <meta name="twitter:description" content="Enable AirPrint for printers that already work with a modern Mac.">
+    <meta name="twitter:image" content="https://www.generouscorp.com/printer-bridge/assets/printer-bridge-icon.png">
+    <link rel="icon" type="image/png" href="./assets/printer-bridge-icon.png">
     <style>
       :root {
         color-scheme: light dark;
@@ -43,6 +57,22 @@
         padding: 32px;
         box-shadow: 0 24px 60px rgba(0, 0, 0, 0.12);
         backdrop-filter: blur(12px);
+      }
+
+      .hero {
+        text-align: center;
+      }
+
+      .hero-icon-link {
+        display: inline-block;
+        margin-bottom: 16px;
+      }
+
+      .hero-icon {
+        width: 112px;
+        height: 112px;
+        border-radius: 24px;
+        box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
       }
 
       h1 {
@@ -102,14 +132,20 @@
   <body>
     <main>
       <section class="card">
-        <h1>Printer Bridge</h1>
-        <p>Printer Bridge helps keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.</p>
+        <div class="hero">
+          <a class="hero-icon-link" href="./assets/printer-bridge-icon.png">
+            <img class="hero-icon" src="./assets/printer-bridge-icon.png" alt="Printer Bridge app icon">
+          </a>
+          <h1>Printer Bridge</h1>
+          <p>Printer Bridge is a macOS utility that helps keep older printers useful by enabling AirPrint for printers that already work with a modern Mac.</p>
+        </div>
         <ul>
           <li>If your Mac can already print to it but it does not support AirPrint, Printer Bridge will usually make it available to iPhone, iPad, and other Apple devices.</li>
+          <li>Universal macOS installer for Intel and Apple Silicon</li>
           <li>No analytics, no tracking, no ad network, and no data resale</li>
         </ul>
         <div class="links">
-          <a class="button" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg">Download Installer</a>
+          <a class="button" href="https://github.com/danielraffel/printer-bridge/releases/latest/download/Printer-Bridge.pkg">Download Universal macOS Installer</a>
           <a class="button" href="./legal/privacy.html">Privacy Policy</a>
           <a class="button" href="./legal/terms.html">Terms</a>
           <a class="button" href="https://github.com/danielraffel/printer-bridge">Source on GitHub</a>
