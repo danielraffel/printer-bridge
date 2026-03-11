@@ -58,6 +58,20 @@ The expected development loop is:
 - install, launch, and inspect logs over `ssh macmini`
 - validate printer discovery and print behavior on the target network
 
+## Network Model
+
+PrinterBridge is intended to coexist with overlay networks such as Tailscale.
+
+The bridge should:
+- keep using Bonjour-local identity for AirPrint advertisement and endpoint previews
+- prefer `.local` hostnames over overlay-network FQDNs such as `*.ts.net`
+- continue to function on the local network even when Tailscale or other VPN-style software is active
+
+The bridge should not:
+- depend on Tailscale for discovery
+- advertise AirPrint service URIs using a tailnet hostname
+- treat remote tailnet reachability as part of the AirPrint support contract
+
 The validation CLI is intentionally separate from the end-user app packaging:
 - it is useful for SSH-driven testing and diagnostics
 - it should not be bundled into the default release artifact
@@ -86,6 +100,12 @@ Build the macOS targets:
 ./scripts/dev/build-macos.sh
 ```
 
+That emits a universal Release app bundle at:
+
+```sh
+.build/dist/PrinterBridge.app
+```
+
 Run the shared core tests:
 
 ```sh
@@ -112,6 +132,19 @@ Inspect the current CUPS-backed queue inventory:
 ./scripts/validate/run-local-cli.sh ipp-attributes Brother_HL_2170W_series
 ```
 
+Validate Bonjour publication without touching the GUI:
+
+```sh
+./scripts/validate/run-local-cli.sh advertise-test-service "PrinterBridge Validation" --duration 15
+ippfind -T 2 _ipp._tcp,_universal --print
+```
+
+Exercise the guarded real-printer publication path:
+
+```sh
+./scripts/validate/run-local-cli.sh advertise Brother_HL_2170W_series --duration 15
+```
+
 Toggle the planned bridge state without launching the GUI:
 
 ```sh
@@ -127,4 +160,17 @@ Run the same diagnostics remotely after deploying the CLI:
 ```sh
 ./scripts/deploy/deploy-cli-macmini.sh
 ./scripts/validate/run-cli-on-macmini.sh doctor Brother_HL_2170W_series
+./scripts/validate/run-cli-on-macmini.sh advertise-test-service "PrinterBridge Remote Validation" --duration 15
+```
+
+Deploy the universal app bundle to the Mac mini:
+
+```sh
+./scripts/deploy/deploy-macmini.sh
+```
+
+By default that installs the app to:
+
+```sh
+/Applications/PrinterBridge.app
 ```

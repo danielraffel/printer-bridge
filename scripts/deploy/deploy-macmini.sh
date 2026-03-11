@@ -2,8 +2,8 @@
 set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd -P)"
-APP_PATH="${1:-$ROOT/.build/DerivedData/PrinterBridge/Build/Products/Debug/PrinterBridge.app}"
-REMOTE_PATH="${2:-Applications/PrinterBridge/}"
+APP_PATH="${1:-$ROOT/.build/dist/PrinterBridge.app}"
+REMOTE_PATH="${2:-/Applications/PrinterBridge.app}"
 
 if [ ! -d "$APP_PATH" ]; then
   echo "App bundle not found at: $APP_PATH" >&2
@@ -11,5 +11,14 @@ if [ ! -d "$APP_PATH" ]; then
   exit 1
 fi
 
-ssh macmini "mkdir -p \"\$HOME/$REMOTE_PATH\""
+case "$REMOTE_PATH" in
+  /*)
+    TARGET_PATH="$REMOTE_PATH"
+    ;;
+  *)
+    TARGET_PATH="\$HOME/$REMOTE_PATH"
+    ;;
+esac
+
+ssh macmini "rm -rf \"$TARGET_PATH\""
 scp -r "$APP_PATH" "macmini:$REMOTE_PATH"

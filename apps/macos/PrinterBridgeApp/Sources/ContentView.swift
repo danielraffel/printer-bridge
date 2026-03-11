@@ -2,262 +2,307 @@ import PrinterBridgeCore
 import SwiftUI
 
 struct ContentView: View {
-    @State private var inventorySnapshot: PrinterInventorySnapshot?
-    @State private var bridgeConfiguration = BridgeConfiguration()
-    @State private var bridgeStatus: BridgeStatusSnapshot?
-    @State private var advertisedNameDraft = ""
-    @State private var bridgeMessage: String?
+    private enum Tab: String, CaseIterable, Identifiable {
+        case printers = "Printers"
+        case jobs = "Jobs"
+
+        var id: String { rawValue }
+    }
+
+    @ObservedObject var model: PrinterBridgeViewModel
+
+    @State private var selectedTab: Tab = .printers
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                header
-                GroupBox("Current Focus") {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("macOS-first AirPrint bridge for legacy printers")
-                            .font(.headline)
-                        Text("The current scaffold is optimized for development on Apple Silicon and deployment to the Intel verification host alias `macmini`.")
-                            .foregroundStyle(.secondary)
-                        Text("The development CLI stays separate from the default app artifact so remote SSH diagnostics do not expand the end-user release surface.")
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        TabView(selection: $selectedTab) {
+            printersTab
+                .tabItem {
+                    Label(Tab.printers.rawValue, systemImage: "printer")
                 }
-                GroupBox("Host Topology") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(DevelopmentTopology.hosts) { host in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(host.name)
-                                    .font(.headline)
-                                Text(host.description)
-                                    .foregroundStyle(.secondary)
-                                if let access = host.accessCommand {
-                                    Text(access)
-                                        .font(.system(.body, design: .monospaced))
-                                }
-                            }
-                            if host.id != DevelopmentTopology.hosts.last?.id {
-                                Divider()
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                .tag(Tab.printers)
+
+            jobsTab
+                .tabItem {
+                    Label(Tab.jobs.rawValue, systemImage: "list.bullet.rectangle")
                 }
-                GroupBox("Queue Inventory") {
-                    inventorySection
-                }
-                GroupBox("Bridge Control") {
-                    bridgeControlSection
-                }
-                GroupBox("Next Steps") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        ForEach(ProjectRoadmap.nearTerm, id: \.self) { item in
-                            Label(item, systemImage: "checklist")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, alignment: .leading)
+                .tag(Tab.jobs)
         }
+        .frame(width: 560, height: 470)
         .task {
-            loadBridgeState()
+            model.loadBridgeState()
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(ProjectMetadata.productName)
-                .font(.largeTitle)
-                .fontWeight(.semibold)
-            Text("Universal macOS scaffold for bridging legacy CUPS printers into AirPrint-visible services.")
-                .foregroundStyle(.secondary)
-            HStack(spacing: 16) {
-                Label("Support floor \(ProjectMetadata.minimumSupportedMacOS)", systemImage: "macwindow")
-                Label("Verification alias \(ProjectMetadata.verificationHostAlias)", systemImage: "network")
-            }
-            .font(.system(.body, design: .monospaced))
-        }
-    }
+    private var printersTab: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            statusCard
 
-    @ViewBuilder
-    private var inventorySection: some View {
-        if let inventorySnapshot {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Detected queues: \(inventorySnapshot.queues.count)")
-                    .font(.headline)
-
-                ForEach(inventorySnapshot.queues) { queue in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(queue.name)
-                            .font(.headline)
-                        Text("Status: \(queue.status)")
-                            .foregroundStyle(.secondary)
-                        if let stateDetail = queue.stateDetail, !stateDetail.isEmpty {
-                            Text(stateDetail)
-                                .foregroundStyle(.secondary)
-                        }
-                        if let deviceURI = queue.deviceURI, !deviceURI.isEmpty {
-                            Text(deviceURI)
-                                .font(.system(.footnote, design: .monospaced))
-                        }
-                    }
-
-                    if queue.id != inventorySnapshot.queues.last?.id {
-                        Divider()
-                    }
-                }
-
-                if let preferredInspection = inventorySnapshot.preferredInspection {
-                    Divider()
-                    Text("Preferred Queue")
-                        .font(.headline)
-                    Text("\(preferredInspection.summary.name) is \(preferredInspection.suitability.rawValue)")
-                    Text(preferredInspection.suitabilityReason)
-                        .foregroundStyle(.secondary)
-                    Text("Options exposed: \(preferredInspection.options.count)")
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            ProgressView("Inspecting local printers…")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    @ViewBuilder
-    private var bridgeControlSection: some View {
-        if let inventorySnapshot {
-            VStack(alignment: .leading, spacing: 12) {
-                Picker("Selected Printer", selection: selectedQueueBinding) {
-                    ForEach(inventorySnapshot.queues) { queue in
-                        Text(queue.name).tag(Optional(queue.name))
-                    }
-                }
-                .pickerStyle(.menu)
-
-                TextField("Advertised AirPrint Name", text: $advertisedNameDraft, prompt: Text("Use printer description by default"))
-
-                HStack(spacing: 12) {
-                    Button(bridgeConfiguration.isEnabled ? "Disable AirPrint" : "Enable AirPrint") {
-                        toggleBridgeEnabled()
-                    }
-
-                    Button("Apply Name") {
-                        applyAdvertisedName()
-                    }
-                    .disabled(inventorySnapshot.queues.isEmpty)
-
-                    Button("Reload") {
-                        loadBridgeState()
-                    }
-                }
-
-                if let bridgeStatus {
-                    Divider()
-                    Text("State: \(bridgeStatus.activationState.rawValue)")
-                        .font(.headline)
-                    Text(bridgeStatus.message)
-                        .foregroundStyle(.secondary)
-
-                    if let advertisement = bridgeStatus.advertisement {
-                        Text("Service: \(advertisement.serviceName)")
-                        Text(advertisement.printerURI)
-                            .font(.system(.footnote, design: .monospaced))
-
-                        if !advertisement.warnings.isEmpty {
-                            Divider()
-                            ForEach(advertisement.warnings, id: \.self) { warning in
-                                Text(warning)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
+            GroupBox {
+                VStack(alignment: .leading, spacing: 12) {
+                    Picker("Printer", selection: selectedQueueBinding) {
+                        if let inventorySnapshot = model.inventorySnapshot, !inventorySnapshot.queues.isEmpty {
+                            ForEach(inventorySnapshot.queues) { queue in
+                                Text(queueDisplayName(queue.name)).tag(Optional(queue.name))
                             }
+                        } else {
+                            Text("No printers found").tag(Optional<String>.none)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    HStack(spacing: 10) {
+                        Button(model.bridgeConfiguration.isEnabled ? "Disable AirPrint" : "Enable AirPrint") {
+                            model.toggleBridgeEnabled()
+                        }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(model.inventorySnapshot?.queues.isEmpty ?? true)
+
+                        Button("Refresh") {
+                            model.loadBridgeState()
+                        }
+
+                        Spacer()
+                    }
+                }
+            }
+
+            DisclosureGroup("Advanced") {
+                advancedSection
+                    .padding(.top, 12)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var jobsTab: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Print Queue")
+                        .font(.headline)
+
+                    if let queueName = model.bridgeConfiguration.selectedQueueName {
+                        Text(queueDisplayName(queueName))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Button("Refresh") {
+                    model.reloadJobs()
+                }
+
+                Button("Cancel Active") {
+                    model.cancelActiveJobs()
+                }
+                .disabled(model.jobSnapshot.activeJobs.isEmpty)
+            }
+
+            List {
+                Section("Active") {
+                    if model.jobSnapshot.activeJobs.isEmpty {
+                        emptyJobsRow("No active jobs.")
+                    } else {
+                        ForEach(model.jobSnapshot.activeJobs) { job in
+                            jobRow(job, stateLabel: "Printing")
                         }
                     }
                 }
 
-                if let bridgeMessage, !bridgeMessage.isEmpty {
-                    Divider()
-                    Text(bridgeMessage)
+                Section("Recent") {
+                    if model.recentCompletedJobs.isEmpty {
+                        emptyJobsRow("No recent jobs.")
+                    } else {
+                        ForEach(model.recentCompletedJobs) { job in
+                            jobRow(job, stateLabel: "Completed")
+                        }
+                    }
+                }
+            }
+            .listStyle(.inset)
+
+            if let jobsMessage = model.jobsMessage, !jobsMessage.isEmpty {
+                Text(jobsMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var statusCard: some View {
+        GroupBox {
+            HStack(alignment: .top, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(model.selectedQueueTitle)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+
+                    Text(model.statusSummary)
+                        .foregroundStyle(.secondary)
+
+                    if let statusDetail = model.statusDetail {
+                        Text(statusDetail)
+                            .font(.footnote)
+                            .foregroundStyle(statusDetailColor)
+                    }
+                }
+
+                Spacer()
+
+                Text(model.publicationState.title)
+                    .font(.footnote.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(statusTint.opacity(0.16))
+                    .foregroundStyle(statusTint)
+                    .clipShape(Capsule())
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var advancedSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField("Use printer name", text: $model.advertisedNameDraft)
+                .textFieldStyle(.roundedBorder)
+
+            HStack(spacing: 10) {
+                Button("Apply Name") {
+                    model.applyAdvertisedName()
+                }
+
+                Button("Reset Name") {
+                    model.resetAdvertisedName()
+                }
+                .disabled((model.bridgeConfiguration.advertisedNameOverride ?? "").isEmpty && model.advertisedNameDraft.isEmpty)
+
+                Spacer()
+            }
+
+            detailRow(title: "AirPrint name", value: model.currentAirPrintName)
+            detailRow(title: "Endpoint", value: model.currentEndpointDescription, monospace: true)
+
+            if let bridgeMessage = model.bridgeMessage, !bridgeMessage.isEmpty {
+                Text(bridgeMessage)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let lastBonjourEvent = model.lastBonjourEvent, !lastBonjourEvent.isEmpty {
+                detailRow(title: "Last Bonjour event", value: lastBonjourEvent, monospace: true)
+            }
+
+            if let warnings = model.bridgeStatus?.advertisement?.warnings, !warnings.isEmpty {
+                Divider()
+                ForEach(warnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        } else {
-            ProgressView("Loading bridge configuration…")
-                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var statusTint: Color {
+        switch model.publicationState {
+        case .inactive:
+            return .secondary
+        case .waiting:
+            return .orange
+        case .advertising:
+            return .green
+        case .failed:
+            return .red
+        }
+    }
+
+    private var statusDetailColor: Color {
+        switch model.publicationState {
+        case .failed:
+            return .red
+        case .waiting:
+            return .orange
+        case .inactive, .advertising:
+            return .secondary
         }
     }
 
     private var selectedQueueBinding: Binding<String?> {
         Binding(
-            get: { bridgeConfiguration.selectedQueueName },
-            set: { newValue in
-                bridgeConfiguration.selectedQueueName = newValue
-                persistConfiguration(message: "Selected printer updated.")
-            }
+            get: { model.bridgeConfiguration.selectedQueueName },
+            set: { model.updateSelectedQueue($0) }
         )
     }
 
-    private func loadBridgeState() {
-        let store = BridgeConfigurationStore()
-        let inventoryService = PrinterInventoryService()
-        let statusService = BridgeStatusService(inventoryService: inventoryService)
+    @ViewBuilder
+    private func jobRow(_ job: PrintJob, stateLabel: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: stateLabel == "Printing" ? "printer.fill" : "checkmark.circle.fill")
+                .foregroundStyle(stateLabel == "Printing" ? .blue : .green)
 
-        do {
-            var configuration = try store.load()
-            let snapshot = inventoryService.snapshot(preferredQueueName: configuration.selectedQueueName)
-
-            if configuration.selectedQueueName == nil {
-                configuration.selectedQueueName = snapshot.queues.first?.name
+            VStack(alignment: .leading, spacing: 3) {
+                Text(job.id)
+                    .font(.subheadline.weight(.medium))
+                Text("\(job.owner) • \(job.submittedAt)")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
             }
 
-            bridgeConfiguration = configuration
-            advertisedNameDraft = configuration.advertisedNameOverride ?? ""
-            inventorySnapshot = snapshot
-            bridgeStatus = statusService.evaluate(configuration: configuration)
-            bridgeMessage = nil
-        } catch {
-            bridgeMessage = "Failed to load bridge state: \(error.localizedDescription)"
-            inventorySnapshot = inventoryService.snapshot(preferredQueueName: ProjectMetadata.primaryTargetPrinter)
-            bridgeStatus = nil
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 3) {
+                Text(stateLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                if let sizeBytes = job.sizeBytes {
+                    Text(byteCountFormatter.string(fromByteCount: Int64(sizeBytes)))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private func emptyJobsRow(_ text: String) -> some View {
+        Text(text)
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func detailRow(title: String, value: String, monospace: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(monospace ? .system(.footnote, design: .monospaced) : .body)
+                .textSelection(.enabled)
         }
     }
 
-    private func toggleBridgeEnabled() {
-        bridgeConfiguration.isEnabled.toggle()
-        persistConfiguration(
-            message: bridgeConfiguration.isEnabled
-                ? "Bridge enabled for \(bridgeConfiguration.selectedQueueName ?? "the selected queue")."
-                : "Bridge disabled."
-        )
+    private func queueDisplayName(_ queueName: String) -> String {
+        queueName.replacingOccurrences(of: "_", with: " ")
     }
 
-    private func applyAdvertisedName() {
-        bridgeConfiguration.advertisedNameOverride = advertisedNameDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? nil
-            : advertisedNameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        persistConfiguration(message: "Advertised name updated.")
-    }
-
-    private func persistConfiguration(message: String) {
-        let store = BridgeConfigurationStore()
-        let inventoryService = PrinterInventoryService()
-        let statusService = BridgeStatusService(inventoryService: inventoryService)
-
-        do {
-            try store.save(bridgeConfiguration)
-            inventorySnapshot = inventoryService.snapshot(preferredQueueName: bridgeConfiguration.selectedQueueName)
-            bridgeStatus = statusService.evaluate(configuration: bridgeConfiguration)
-            bridgeMessage = message
-        } catch {
-            bridgeMessage = "Failed to save bridge configuration: \(error.localizedDescription)"
-        }
+    private var byteCountFormatter: ByteCountFormatter {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter
     }
 }
 
 #Preview {
-    ContentView()
+    ContentView(model: PrinterBridgeViewModel())
 }

@@ -1,4 +1,5 @@
 import Foundation
+import SystemConfiguration
 
 public enum BridgeActivationState: String, Equatable, Sendable {
     case disabled = "disabled"
@@ -74,21 +75,28 @@ public struct BridgeStatusSnapshot: Equatable, Sendable {
         self.message = message
         self.advertisement = advertisement
     }
+
+    public var isPublishable: Bool {
+        configuration.isEnabled && activationState == .ready && advertisement != nil
+    }
 }
 
 public struct BridgeStatusService {
     private let inventoryService: PrinterInventoryService
     private let attributeService: IPPPrinterAttributeService
     private let hostNameProvider: () -> String
+    private let displayNameProvider: () -> String
 
     public init(
         inventoryService: PrinterInventoryService = PrinterInventoryService(),
         attributeService: IPPPrinterAttributeService = IPPPrinterAttributeService(),
-        hostNameProvider: @escaping () -> String = { BridgeStatusService.defaultHostName() }
+        hostNameProvider: @escaping () -> String = { BridgeStatusService.defaultHostName() },
+        displayNameProvider: @escaping () -> String = { BridgeStatusService.defaultDisplayName() }
     ) {
         self.inventoryService = inventoryService
         self.attributeService = attributeService
         self.hostNameProvider = hostNameProvider
+        self.displayNameProvider = displayNameProvider
     }
 
     public func evaluate(configuration: BridgeConfiguration) -> BridgeStatusSnapshot {
@@ -165,6 +173,7 @@ public struct BridgeStatusService {
             "Summary",
             "- state: \(snapshot.activationState.rawValue)",
             "- enabled: \(snapshot.configuration.isEnabled ? "yes" : "no")",
+            "- publishable: \(snapshot.isPublishable ? "yes" : "no")",
             "- exposure mode: \(snapshot.configuration.exposureMode.rawValue)",
             "- queues detected: \(snapshot.availableQueues.count)",
             "- message: \(snapshot.message)",
@@ -230,9 +239,10 @@ public struct BridgeStatusService {
         configuration: BridgeConfiguration
     ) -> AirPrintAdvertisementPlan {
         let hostName = hostNameProvider()
-        let serviceName = configuration.advertisedNameOverride
-            ?? inspection.detail.description
+        let baseServiceName = inspection.detail.description
             ?? inspection.summary.name.replacingOccurrences(of: "_", with: " ")
+        let serviceName = configuration.advertisedNameOverride
+            ?? "\(baseServiceName) @ \(displayNameProvider())"
 
         let encodedQueueName = inspection.summary.name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? inspection.summary.name
@@ -278,7 +288,6 @@ public struct BridgeStatusService {
         let makeAndModel = attributes?.stringValue(named: "printer-make-and-model")
             ?? inspection.detail.description
             ?? serviceName
-        let adminURL = "http://\(hostName):631\(resourcePath)"
         let documentFormats = supportedDocumentFormats(from: attributes)
         let colorValue = (attributes?.boolValue(named: "color-supported") ?? false) ? "T" : "F"
         let duplexValue = supportsDuplex(attributes: attributes, inspection: inspection) ? "T" : "F"
@@ -289,7 +298,6 @@ public struct BridgeStatusService {
             AirPrintAdvertisementPlan.TXTRecord(key: "rp", value: rpValue),
             AirPrintAdvertisementPlan.TXTRecord(key: "ty", value: printerInfo),
             AirPrintAdvertisementPlan.TXTRecord(key: "product", value: "(\(makeAndModel))"),
-            AirPrintAdvertisementPlan.TXTRecord(key: "adminurl", value: adminURL),
             AirPrintAdvertisementPlan.TXTRecord(key: "priority", value: "0"),
             AirPrintAdvertisementPlan.TXTRecord(key: "Color", value: colorValue),
             AirPrintAdvertisementPlan.TXTRecord(key: "Duplex", value: duplexValue),
@@ -404,12 +412,75 @@ public struct BridgeStatusService {
     }
 
     public static func defaultHostName() -> String {
-        let processHostName = ProcessInfo.processInfo.hostName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if !processHostName.isEmpty {
+        preferredBonjourHostName(
+            localHostName: SCDynamicStoreCopyLocalHostName(nil) as String?,
+            hostCurrentName: Host.current().name,
+            processHostName: ProcessInfo.processInfo.hostName
+        )
+    }
+
+    public static func defaultDisplayName() -> String {
+        var encoding = CFStringEncoding(0)
+        if let computerName = SCDynamicStoreCopyComputerName(nil, &encoding) as String? {
+            let trimmed = computerName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty {
+                return trimmed
+            }
+        }
+
+        if let localizedName = Host.current().localizedName?.trimmingCharacters(in: .whitespacesAndNewlines), !localizedName.isEmpty {
+            return localizedName
+        }
+
+        let hostName = defaultHostName()
+        if let normalized = normalizeBonjourHostName(hostName, requireLocalIdentity: false) {
+            return normalized.replacingOccurrences(of: ".local", with: "")
+        }
+
+        return "This Mac"
+    }
+
+    static func preferredBonjourHostName(
+        localHostName: String?,
+        hostCurrentName: String?,
+        processHostName: String?
+    ) -> String {
+        if let localHostName = normalizeBonjourHostName(localHostName, requireLocalIdentity: false) {
+            return localHostName.hasSuffix(".local") ? localHostName : "\(localHostName).local"
+        }
+
+        if let hostCurrentName = normalizeBonjourHostName(hostCurrentName, requireLocalIdentity: true) {
+            return hostCurrentName
+        }
+
+        if let processHostName = normalizeBonjourHostName(processHostName, requireLocalIdentity: true) {
             return processHostName
         }
 
-        return Host.current().name ?? "localhost"
+        return "localhost.local"
+    }
+
+    private static func normalizeBonjourHostName(
+        _ candidate: String?,
+        requireLocalIdentity: Bool
+    ) -> String? {
+        guard let candidate else {
+            return nil
+        }
+
+        let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        if trimmed.hasSuffix(".local") {
+            return trimmed
+        }
+
+        if !trimmed.contains(".") {
+            return "\(trimmed).local"
+        }
+
+        return requireLocalIdentity ? nil : trimmed
     }
 }

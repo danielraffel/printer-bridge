@@ -21,11 +21,14 @@ targets:
     platform: macOS
     sources:
       - path: PrinterBridgeApp/Sources
+      - path: PrinterBridgeApp/Resources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.danielraffel.printerbridge
         PRODUCT_NAME: PrinterBridge
         GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: PrinterBridge
         INFOPLIST_KEY_LSMinimumSystemVersion: "15.0"
         CURRENT_PROJECT_VERSION: 1

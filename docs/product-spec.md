@@ -87,6 +87,7 @@ This means the replacement product does not need to reinvent print drivers. It n
 - Expose internals when useful: queue URI, advertised service name, TXT records, last registration time, helper status.
 - Separate UI concerns from privileged/background behavior.
 - Make the Brother path excellent before optimizing for every printer.
+- Detect setup prerequisites first, and only guide the user when something is actually missing.
 
 ## 7. High-Level Solution
 
@@ -99,6 +100,7 @@ The product will consist of two cooperating components:
 - status dashboard
 - logs and diagnostics view
 - test and verification tooling
+- contextual TipKit guidance only when diagnostics confirm a user action is required
 
 ### 7.1.1 Development Diagnostics CLI
 - Separate macOS command-line target for development, SSH validation, and automation.
@@ -217,7 +219,7 @@ Confirm the minimal bridge architecture that works for the Brother printer and d
 - validated CUPS filter chain for the Brother path, including PDF/URF/PWG input to backing queue behavior
 - captured working `device-uri` and `printer-uri-supported` patterns for supported queues
 - recorded behavior for existing CUPS or system auto-advertisement to avoid duplicate announcements
-- recorded multi-interface behavior for Wi-Fi and Ethernet hosts
+- recorded multi-interface behavior for Wi-Fi, Ethernet, and overlay-network hosts such as Tailscale-enabled Macs
 - documented local-build and remote-deploy workflow for the MacBook Pro to Mac mini loop
 - decision memo: direct CUPS exposure vs dedicated proxy endpoint
 - repeatable local verification checklist
@@ -311,6 +313,7 @@ Make the product dependable enough for regular use by non-technical users.
 - exportable diagnostics bundle
 - activity log
 - update mechanism
+- contextual TipKit tips for remediating missing prerequisites such as printer sharing, permissions, or conflicting legacy bridge software
 
 ### Acceptance Criteria
 - First-run setup can be completed without Terminal.
@@ -363,6 +366,7 @@ Add deeper compatibility features if required by real-world printers.
 - enumerate CUPS printers
 - show queue name, display name, device URI, make/model, sharing state
 - detect whether queue appears already AirPrint-capable
+- detect whether host prerequisites such as printer sharing are already satisfied before prompting the user
 
 ### Capability Inspection
 - inspect IPP printer attributes
@@ -373,6 +377,8 @@ Add deeper compatibility features if required by real-world printers.
 - register and unregister Bonjour services
 - maintain correct TXT records for AirPrint visibility
 - avoid duplicate or conflicting advertisements
+- prefer Bonjour-local host identity for advertised endpoints, even when the host also has overlay-network names such as Tailscale `*.ts.net`
+- keep AirPrint discovery scoped to the local network rather than tailnet-specific addressing
 
 ### Bridging
 - expose a usable IPP endpoint for Apple clients
@@ -384,6 +390,7 @@ Add deeper compatibility features if required by real-world printers.
 - show current published services
 - show queue health
 - show recent job attempts and last error
+- show unmet prerequisites explicitly so the UI can decide whether a TipKit prompt is necessary
 
 ## 12. Non-Functional Requirements
 
@@ -399,6 +406,7 @@ Add deeper compatibility features if required by real-world printers.
   - network interface changes
   - daemon restart
   - printer temporary unavailability
+- keep local Bonjour advertisement stable when overlay-network software such as Tailscale is installed or connected
 
 ### Security
 - minimize privileged surface area
@@ -437,6 +445,12 @@ Mitigation:
 Mitigation:
 - test on Wi-Fi-only, Ethernet-only, and dual-interface Macs
 - make selected/active advertisement interfaces visible in diagnostics
+
+### Overlay Network Coexistence
+Mitigation:
+- prefer `LocalHostName.local` or equivalent Bonjour-local identity over VPN or tailnet FQDNs
+- verify that Tailscale-enabled hosts still advertise usable local AirPrint endpoints
+- do not treat tailnet routing as part of the AirPrint transport model
 
 ### Bonjour / TXT Record Fragility
 Mitigation:
@@ -495,6 +509,7 @@ Mitigation:
 - Wi‑Fi changed
 - Ethernet changed
 - Wi‑Fi and Ethernet both active
+- Tailscale active with local AirPrint advertisement still using `.local`
 - multiple Apple clients discovering printer simultaneously
 - printer removed and re-added
 

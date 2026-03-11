@@ -2,6 +2,11 @@ import Foundation
 import PrinterBridgeCore
 
 enum PrinterBridgeCLI {
+    struct AdvertiseOptions {
+        let printerName: String?
+        let duration: TimeInterval
+    }
+
     static let usage = """
         Usage:
           PrinterBridgeCLI overview
@@ -9,6 +14,8 @@ enum PrinterBridgeCLI {
           PrinterBridgeCLI roadmap
           PrinterBridgeCLI show-config
           PrinterBridgeCLI bridge-status
+          PrinterBridgeCLI advertise [printer-name] [--duration seconds]
+          PrinterBridgeCLI advertise-test-service [service-name] [--duration seconds] [--port port]
           PrinterBridgeCLI enable [printer-name]
           PrinterBridgeCLI disable
           PrinterBridgeCLI set-advertised-name <name>
@@ -55,6 +62,68 @@ enum PrinterBridgeCLI {
                 print(statusService.renderStatus(configuration: configuration))
             } catch {
                 fputs("Failed to evaluate bridge status: \(error)\n", stderr)
+                exit(1)
+            }
+        case "advertise":
+            guard let options = parseAdvertiseOptions(Array(arguments.dropFirst())) else {
+                fputs("advertise accepts an optional printer name and `--duration <seconds>`.\n\n\(usage)\n", stderr)
+                exit(2)
+            }
+
+            do {
+                let storedConfiguration = try configurationStore.load()
+                let configuration = advertiseConfiguration(from: storedConfiguration, printerNameOverride: options.printerName)
+                let snapshot = statusService.evaluate(configuration: configuration)
+                print(statusService.renderStatus(configuration: configuration))
+
+                guard snapshot.isPublishable, let advertisement = snapshot.advertisement else {
+                    fputs("\nThe selected queue is not publishable yet.\n", stderr)
+                    exit(1)
+                }
+
+                try runAdvertisement(advertisement, duration: options.duration)
+            } catch {
+                fputs("Failed to advertise bridge service: \(error)\n", stderr)
+                exit(1)
+            }
+        case "advertise-test-service":
+            guard let options = parseTestAdvertiseOptions(Array(arguments.dropFirst())) else {
+                fputs("advertise-test-service accepts an optional service name plus `--duration <seconds>` and `--port <port>`.\n\n\(usage)\n", stderr)
+                exit(2)
+            }
+
+            let hostName = BridgeStatusService.defaultHostName()
+            let serviceName = options.serviceName ?? "PrinterBridge Test"
+            let resourcePath = "printers/test"
+            let advertisement = AirPrintAdvertisementPlan(
+                serviceName: serviceName,
+                hostName: hostName,
+                port: options.port,
+                resourcePath: "/\(resourcePath)",
+                printerURI: "ipp://\(hostName):\(options.port)/\(resourcePath)",
+                backingQueueName: "test",
+                exposureMode: .directCUPS,
+                txtRecords: [
+                    .init(key: "txtvers", value: "1"),
+                    .init(key: "qtotal", value: "1"),
+                    .init(key: "rp", value: resourcePath),
+                    .init(key: "ty", value: serviceName),
+                    .init(key: "product", value: "(PrinterBridge Test Service)"),
+                    .init(key: "pdl", value: "application/pdf,image/urf,image/pwg-raster"),
+                    .init(key: "URF", value: "W8,RS300-600"),
+                ],
+                warnings: ["Development-only synthetic AirPrint advertisement."]
+            )
+
+            do {
+                print("Synthetic AirPrint advertisement")
+                print("- service name: \(advertisement.serviceName)")
+                print("- printer URI: \(advertisement.printerURI)")
+                print("- port: \(advertisement.port)")
+                print("- warning: \(advertisement.warnings.joined(separator: " "))")
+                try runAdvertisement(advertisement, duration: options.duration)
+            } catch {
+                fputs("Failed to advertise synthetic service: \(error)\n", stderr)
                 exit(1)
             }
         case "enable":
@@ -168,6 +237,121 @@ enum PrinterBridgeCLI {
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    static func parseAdvertiseOptions(_ arguments: [String]) -> AdvertiseOptions? {
+        parseAdvertiseOptions(arguments, allowPort: false).map { AdvertiseOptions(printerName: $0.serviceName, duration: $0.duration) }
+    }
+
+    static func parseTestAdvertiseOptions(_ arguments: [String]) -> TestAdvertiseOptions? {
+        parseAdvertiseOptions(arguments, allowPort: true)
+    }
+
+    static func parseAdvertiseOptions(
+        _ arguments: [String],
+        allowPort: Bool
+    ) -> TestAdvertiseOptions? {
+        var printerName: String?
+        var duration: TimeInterval = 30
+        var port = 8631
+        var index = 0
+
+        while index < arguments.count {
+            let argument = arguments[index]
+            if argument == "--duration" {
+                guard index + 1 < arguments.count, let parsedDuration = TimeInterval(arguments[index + 1]), parsedDuration >= 0 else {
+                    return nil
+                }
+
+                duration = parsedDuration
+                index += 2
+                continue
+            }
+
+            if argument == "--port" {
+                guard allowPort, index + 1 < arguments.count, let parsedPort = Int(arguments[index + 1]), parsedPort > 0, parsedPort < 65536 else {
+                    return nil
+                }
+
+                port = parsedPort
+                index += 2
+                continue
+            }
+
+            guard printerName == nil else {
+                return nil
+            }
+
+            printerName = argument
+            index += 1
+        }
+
+        return TestAdvertiseOptions(serviceName: printerName, duration: duration, port: port)
+    }
+
+    static func advertiseConfiguration(
+        from configuration: BridgeConfiguration,
+        printerNameOverride: String?
+    ) -> BridgeConfiguration {
+        var configuration = configuration
+        configuration.isEnabled = true
+        configuration.selectedQueueName = printerNameOverride ?? configuration.selectedQueueName ?? ProjectMetadata.primaryTargetPrinter
+        return configuration
+    }
+
+    static func renderPublisherOutput(_ chunk: String) {
+        let lines = chunk
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        for line in lines {
+            print("[dns-sd] \(line)")
+        }
+    }
+
+    static func runAdvertisement(
+        _ advertisement: AirPrintAdvertisementPlan,
+        duration: TimeInterval
+    ) throws {
+        let publisher = BonjourAdvertisementService()
+        let session = try publisher.publish(advertisement) { chunk in
+            renderPublisherOutput(chunk)
+        }
+        defer {
+            _ = session.stop()
+        }
+
+        let durationDescription = duration == 0 ? "until interrupted" : "\(Int(duration.rounded())) seconds"
+        print("\nAdvertising `\(advertisement.serviceName)` for \(durationDescription).")
+
+        var shouldStop = false
+        let signalMonitor = ProcessSignalMonitor {
+            shouldStop = true
+        }
+        _ = signalMonitor
+
+        if duration == 0 {
+            while !shouldStop && session.isRunning {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.25))
+            }
+        } else {
+            let deadline = Date().addingTimeInterval(duration)
+            while !shouldStop && session.isRunning && Date() < deadline {
+                RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.25))
+            }
+        }
+
+        let terminationStatus = session.stop()
+        print("Stopped Bonjour publication (dns-sd exit code \(terminationStatus)).")
+    }
+}
+
+extension PrinterBridgeCLI {
+    struct TestAdvertiseOptions {
+        let serviceName: String?
+        let duration: TimeInterval
+        let port: Int
     }
 }
 
