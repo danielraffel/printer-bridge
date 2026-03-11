@@ -8,6 +8,8 @@ OUTPUT_PKG="$OUTPUT_DIR/Printer-Bridge.pkg"
 OUTPUT_SHA="$OUTPUT_DIR/Printer-Bridge.pkg.sha256"
 WORK_DIR="$OUTPUT_DIR/pkg-work"
 COMPONENT_PKG="$WORK_DIR/PrinterBridgeComponent.pkg"
+COMPONENT_PLIST="$WORK_DIR/component.plist"
+STAGING_ROOT="$WORK_DIR/root"
 DIST_XML="$WORK_DIR/distribution.xml"
 RESOURCES_DIR="$ROOT/packaging/macos/resources"
 APP_PATH="$ROOT/.build/dist/Printer Bridge.app"
@@ -64,8 +66,33 @@ build_distribution() {
 EOF
 }
 
+build_component_plist() {
+  cat >"$COMPONENT_PLIST" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<array>
+  <dict>
+    <key>BundleHasStrictIdentifier</key>
+    <true/>
+    <key>BundleIsRelocatable</key>
+    <false/>
+    <key>BundleIsVersionChecked</key>
+    <true/>
+    <key>BundleOverwriteAction</key>
+    <string>upgrade</string>
+    <key>RootRelativeBundlePath</key>
+    <string>Applications/Printer Bridge.app</string>
+  </dict>
+</array>
+</plist>
+EOF
+}
+
 load_env_file
-"$ROOT/scripts/dev/build-macos.sh"
+if [ "${PRINTERBRIDGE_SKIP_APP_BUILD:-0}" != "1" ]; then
+  "$ROOT/scripts/dev/build-macos.sh"
+fi
 
 mkdir -p "$OUTPUT_DIR"
 rm -rf "$WORK_DIR" "$OUTPUT_PKG" "$OUTPUT_SHA"
@@ -79,11 +106,17 @@ if [ -z "$INSTALLER_IDENTITY" ]; then
   exit 1
 fi
 
+build_component_plist
+
+mkdir -p "$STAGING_ROOT/Applications"
+ditto "$APP_PATH" "$STAGING_ROOT/Applications/Printer Bridge.app"
+
 pkgbuild \
-  --component "$APP_PATH" \
-  --install-location /Applications \
+  --root "$STAGING_ROOT" \
+  --install-location / \
   --identifier com.danielraffel.printerbridge \
   --version "$VERSION" \
+  --component-plist "$COMPONENT_PLIST" \
   "$COMPONENT_PKG"
 
 build_distribution "$VERSION"
