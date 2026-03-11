@@ -1,6 +1,6 @@
-# PrinterBridge
+# Printer Bridge
 
-PrinterBridge is a planned macOS-first AirPrint bridge for legacy printers that already work through CUPS but do not natively appear as AirPrint printers to Apple devices.
+Printer Bridge is a macOS-first AirPrint bridge for legacy printers that already work through CUPS but do not natively appear as AirPrint printers to Apple devices.
 
 The initial target is a Brother HL-2170W environment verified through:
 - development on an Apple Silicon MacBook Pro running macOS 26.x
@@ -22,7 +22,7 @@ The current bridge runtime is:
 
 ## Recommended Name
 
-The recommended project name is `PrinterBridge`.
+The recommended project name is `Printer Bridge`.
 
 Why this name:
 - generic enough for future Linux support

@@ -1,4 +1,4 @@
-# PrinterBridge
+# Printer Bridge
 
 ## Product Spec
 
