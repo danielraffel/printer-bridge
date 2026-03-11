@@ -55,4 +55,38 @@ func configurationStoreLoadsLegacyConfigurationWithoutBackgroundFlag() throws {
     #expect(loaded.exposureMode == .directCUPS)
     #expect(loaded.keepRunningInBackground == true)
     #expect(loaded.selectedQueueName == "Brother_HL_2170W_series")
+    #expect(loaded.printers.count == 1)
+    #expect(loaded.printers.first?.queueName == "Brother_HL_2170W_series")
+    #expect(loaded.printers.first?.proxyPort == ProjectMetadata.defaultProxyPort)
+}
+
+@Test
+func configurationNormalizesManagedPrintersAndAllocatesDistinctProxyPorts() {
+    var configuration = BridgeConfiguration(
+        selectedQueueName: " Brother_HL_2170W_series ",
+        printers: [
+            ManagedPrinterConfiguration(queueName: " Brother_HL_2170W_series ", isEnabled: true, proxyPort: nil),
+            ManagedPrinterConfiguration(queueName: "Office_Printer", isEnabled: true, proxyPort: ProjectMetadata.defaultProxyPort),
+            ManagedPrinterConfiguration(queueName: "Office_Printer", isEnabled: false, proxyPort: 8639),
+        ],
+        exposureMode: .proxy
+    )
+
+    configuration.normalize()
+
+    #expect(configuration.selectedQueueName == "Brother_HL_2170W_series")
+    #expect(configuration.printers.count == 2)
+    #expect(configuration.printers.map(\.queueName) == ["Brother_HL_2170W_series", "Office_Printer"])
+    #expect(Set(configuration.printers.compactMap(\.proxyPort)).count == 2)
+}
+
+@Test
+func configurationSetEnabledCreatesManagedPrinterEntry() {
+    var configuration = BridgeConfiguration(selectedQueueName: "Hallway_Printer")
+
+    configuration.setEnabled(true, forQueueNamed: "Hallway_Printer")
+
+    #expect(configuration.printers.count == 1)
+    #expect(configuration.printers.first?.queueName == "Hallway_Printer")
+    #expect(configuration.printers.first?.isEnabled == true)
 }

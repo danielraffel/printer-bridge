@@ -55,22 +55,84 @@ public struct AirPrintAdvertisementPlan: Equatable, Sendable {
 public struct BridgeStatusSnapshot: Equatable, Sendable {
     public let configuration: BridgeConfiguration
     public let availableQueues: [PrinterQueueSummary]
-    public let selectedQueue: PrinterQueueInspection?
-    public let activationState: BridgeActivationState
-    public let message: String
-    public let advertisement: AirPrintAdvertisementPlan?
+    public let managedPrinters: [ManagedPrinterStatus]
+    public let selectedPrinter: ManagedPrinterStatus?
 
     public init(
         configuration: BridgeConfiguration,
         availableQueues: [PrinterQueueSummary],
-        selectedQueue: PrinterQueueInspection?,
+        managedPrinters: [ManagedPrinterStatus],
+        selectedPrinter: ManagedPrinterStatus?
+    ) {
+        self.configuration = configuration
+        self.availableQueues = availableQueues
+        self.managedPrinters = managedPrinters
+        self.selectedPrinter = selectedPrinter
+    }
+
+    public var isPublishable: Bool {
+        selectedPrinter?.isPublishable ?? false
+    }
+
+    public var selectedQueue: PrinterQueueInspection? {
+        selectedPrinter?.inspection
+    }
+
+    public var activationState: BridgeActivationState {
+        selectedPrinter?.activationState
+            ?? (enabledPrinterCount > 0 ? .needsReview : .disabled)
+    }
+
+    public var message: String {
+        selectedPrinter?.message
+            ?? (enabledPrinterCount > 0
+                ? "One or more printers need additional validation before they can be shared."
+                : "Bridge is disabled.")
+    }
+
+    public var advertisement: AirPrintAdvertisementPlan? {
+        selectedPrinter?.advertisement
+    }
+
+    public var enabledPrinterCount: Int {
+        managedPrinters.filter { $0.configuration.isEnabled }.count
+    }
+
+    public var livePrinterCount: Int {
+        managedPrinters.filter(\.isPublishable).count
+    }
+
+    public var publishableAdvertisements: [AirPrintAdvertisementPlan] {
+        managedPrinters.compactMap { $0.isPublishable ? $0.advertisement : nil }
+    }
+
+    public func status(forQueueNamed queueName: String?) -> ManagedPrinterStatus? {
+        guard let queueName else {
+            return nil
+        }
+
+        return managedPrinters.first(where: { $0.configuration.queueName == queueName })
+    }
+}
+
+public struct ManagedPrinterStatus: Equatable, Identifiable, Sendable {
+    public let configuration: ManagedPrinterConfiguration
+    public let inspection: PrinterQueueInspection?
+    public let activationState: BridgeActivationState
+    public let message: String
+    public let advertisement: AirPrintAdvertisementPlan?
+
+    public var id: String { configuration.queueName }
+
+    public init(
+        configuration: ManagedPrinterConfiguration,
+        inspection: PrinterQueueInspection?,
         activationState: BridgeActivationState,
         message: String,
         advertisement: AirPrintAdvertisementPlan?
     ) {
         self.configuration = configuration
-        self.availableQueues = availableQueues
-        self.selectedQueue = selectedQueue
+        self.inspection = inspection
         self.activationState = activationState
         self.message = message
         self.advertisement = advertisement
@@ -99,66 +161,21 @@ public struct BridgeStatusService {
     public func evaluate(configuration: BridgeConfiguration) -> BridgeStatusSnapshot {
         let normalizedConfiguration = normalized(configuration: configuration)
         let availableQueues = inventoryService.listQueues()
-        let selectedQueue = normalizedConfiguration.selectedQueueName.flatMap { inventoryService.inspectQueue(named: $0) }
-
-        guard normalizedConfiguration.isEnabled else {
-            let attributes = selectedQueue.flatMap { attributeService.fetchAttributes(forQueueNamed: $0.summary.name) }
-            return BridgeStatusSnapshot(
-                configuration: normalizedConfiguration,
-                availableQueues: availableQueues,
-                selectedQueue: selectedQueue,
-                activationState: .disabled,
-                message: "Bridge is disabled.",
-                advertisement: selectedQueue.flatMap {
-                    makeAdvertisementPlan(
-                        for: $0,
-                        attributes: attributes,
-                        configuration: normalizedConfiguration
-                    )
-                }
-            )
+        let queueNames = Set(availableQueues.map(\.name))
+            .union(normalizedConfiguration.printers.map(\.queueName))
+            .sorted()
+        let managedPrinters = queueNames.map { queueName in
+            buildManagedPrinterStatus(queueName: queueName, configuration: normalizedConfiguration)
         }
-
-        guard let selectedQueue else {
-            return BridgeStatusSnapshot(
-                configuration: normalizedConfiguration,
-                availableQueues: availableQueues,
-                selectedQueue: nil,
-                activationState: .unavailable,
-                message: "The selected printer queue is not available on this Mac.",
-                advertisement: nil
-            )
-        }
-
-        let attributes = attributeService.fetchAttributes(forQueueNamed: selectedQueue.summary.name)
-        let advertisement = makeAdvertisementPlan(
-            for: selectedQueue,
-            attributes: attributes,
-            configuration: normalizedConfiguration
-        )
-        let activationState: BridgeActivationState
-        if selectedQueue.suitability == .needsReview || !advertisement.warnings.isEmpty {
-            activationState = .needsReview
-        } else {
-            activationState = .ready
-        }
-        let message: String
-        switch activationState {
-        case .ready:
-            message = "Bridge can advertise the selected CUPS queue."
-        case .needsReview:
-            message = "Bridge is enabled, but the selected queue needs additional validation before it is publishable."
-        case .disabled, .unavailable:
-            message = ""
-        }
+        let selectedPrinter = normalizedConfiguration.selectedQueueName.flatMap { selectedQueueName in
+            managedPrinters.first(where: { $0.configuration.queueName == selectedQueueName })
+        } ?? managedPrinters.first
 
         return BridgeStatusSnapshot(
             configuration: normalizedConfiguration,
             availableQueues: availableQueues,
-            selectedQueue: selectedQueue,
-            activationState: activationState,
-            message: message,
-            advertisement: advertisement
+            managedPrinters: managedPrinters,
+            selectedPrinter: selectedPrinter
         )
     }
 
@@ -168,23 +185,46 @@ public struct BridgeStatusService {
             "PrinterBridge bridge status",
             "",
             "Summary",
-            "- state: \(snapshot.activationState.rawValue)",
-            "- enabled: \(snapshot.configuration.isEnabled ? "yes" : "no")",
-            "- publishable: \(snapshot.isPublishable ? "yes" : "no")",
+            "- focused state: \(snapshot.activationState.rawValue)",
+            "- managed printers: \(snapshot.managedPrinters.count)",
+            "- enabled printers: \(snapshot.enabledPrinterCount)",
+            "- live printers: \(snapshot.livePrinterCount)",
             "- exposure mode: \(snapshot.configuration.exposureMode.rawValue)",
             "- queues detected: \(snapshot.availableQueues.count)",
             "- message: \(snapshot.message)",
         ]
 
         if let selectedQueueName = snapshot.configuration.selectedQueueName, !selectedQueueName.isEmpty {
-            lines.append("- selected queue: \(selectedQueueName)")
+            lines.append("- focused queue: \(selectedQueueName)")
         }
 
-        if let advertisedNameOverride = snapshot.configuration.advertisedNameOverride, !advertisedNameOverride.isEmpty {
-            lines.append("- advertised name override: \(advertisedNameOverride)")
+        if !snapshot.managedPrinters.isEmpty {
+            lines.append("")
+            lines.append("Managed Printers")
+            for printer in snapshot.managedPrinters {
+                var printerLine = "- \(printer.configuration.queueName): \(printer.activationState.rawValue)"
+                if printer.configuration.isEnabled {
+                    printerLine += " [enabled]"
+                }
+                if printer.isPublishable {
+                    printerLine += " [live]"
+                }
+                if let proxyPort = printer.configuration.proxyPort, snapshot.configuration.exposureMode == .proxy {
+                    printerLine += " [port \(proxyPort)]"
+                }
+                lines.append(printerLine)
+                if let override = printer.configuration.advertisedNameOverride, !override.isEmpty {
+                    lines.append("  name override: \(override)")
+                }
+                if !printer.message.isEmpty {
+                    lines.append("  message: \(printer.message)")
+                }
+            }
         }
 
         if let selectedQueue = snapshot.selectedQueue {
+            lines.append("")
+            lines.append("Focused Queue")
             lines.append("- queue suitability: \(selectedQueue.suitability.rawValue)")
         }
 
@@ -219,32 +259,97 @@ public struct BridgeStatusService {
 
     private func normalized(configuration: BridgeConfiguration) -> BridgeConfiguration {
         var configuration = configuration
-        if let selectedQueueName = configuration.selectedQueueName?.trimmingCharacters(in: .whitespacesAndNewlines) {
-            configuration.selectedQueueName = selectedQueueName.isEmpty ? nil : selectedQueueName
-        }
-
-        if let advertisedNameOverride = configuration.advertisedNameOverride?.trimmingCharacters(in: .whitespacesAndNewlines) {
-            configuration.advertisedNameOverride = advertisedNameOverride.isEmpty ? nil : advertisedNameOverride
-        }
-
+        configuration.normalize()
         return configuration
+    }
+
+    private func buildManagedPrinterStatus(
+        queueName: String,
+        configuration: BridgeConfiguration
+    ) -> ManagedPrinterStatus {
+        let managedConfiguration = configuration.managedPrinter(queueName: queueName)
+            ?? ManagedPrinterConfiguration(queueName: queueName)
+        let inspection = inventoryService.inspectQueue(named: queueName)
+
+        guard managedConfiguration.isEnabled else {
+            return ManagedPrinterStatus(
+                configuration: managedConfiguration,
+                inspection: inspection,
+                activationState: .disabled,
+                message: "AirPrint is off for this printer.",
+                advertisement: inspection.map {
+                    makeAdvertisementPlan(
+                        for: $0,
+                        attributes: nil,
+                        managedPrinter: managedConfiguration,
+                        exposureMode: configuration.exposureMode
+                    )
+                }
+            )
+        }
+
+        guard let inspection else {
+            return ManagedPrinterStatus(
+                configuration: managedConfiguration,
+                inspection: nil,
+                activationState: .unavailable,
+                message: "This printer queue is not available on this Mac.",
+                advertisement: nil
+            )
+        }
+
+        let attributes = attributeService.fetchAttributes(forQueueNamed: inspection.summary.name)
+        let advertisement = makeAdvertisementPlan(
+            for: inspection,
+            attributes: attributes,
+            managedPrinter: managedConfiguration,
+            exposureMode: configuration.exposureMode
+        )
+        let activationState: BridgeActivationState
+        if inspection.suitability == .needsReview || !advertisement.warnings.isEmpty {
+            activationState = .needsReview
+        } else {
+            activationState = .ready
+        }
+
+        let message: String
+        switch activationState {
+        case .ready:
+            message = "Ready to share over AirPrint."
+        case .needsReview:
+            message = advertisement.warnings.first
+                ?? "This printer needs additional validation before it can be shared."
+        case .disabled:
+            message = "AirPrint is off for this printer."
+        case .unavailable:
+            message = "This printer queue is not available on this Mac."
+        }
+
+        return ManagedPrinterStatus(
+            configuration: managedConfiguration,
+            inspection: inspection,
+            activationState: activationState,
+            message: message,
+            advertisement: advertisement
+        )
     }
 
     private func makeAdvertisementPlan(
         for inspection: PrinterQueueInspection,
         attributes: IPPPrinterAttributesSnapshot?,
-        configuration: BridgeConfiguration
+        managedPrinter: ManagedPrinterConfiguration,
+        exposureMode: BridgeExposureMode
     ) -> AirPrintAdvertisementPlan {
         let hostName = hostNameProvider()
         let baseServiceName = inspection.detail.description
             ?? inspection.summary.name.replacingOccurrences(of: "_", with: " ")
-        let serviceName = configuration.advertisedNameOverride
+        let serviceName = managedPrinter.advertisedNameOverride
             ?? "\(baseServiceName) via \(ProjectMetadata.serviceDisplayName)"
 
         let encodedQueueName = inspection.summary.name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? inspection.summary.name
         let resourcePath = "/printers/\(encodedQueueName)"
-        let port = advertisedPort(for: configuration.exposureMode)
+        let port = advertisedPort(for: exposureMode, managedPrinter: managedPrinter)
         let printerURI = "ipp://\(hostName):\(port)\(resourcePath)"
         let txtRecords = makeTXTRecords(
             serviceName: serviceName,
@@ -257,7 +362,7 @@ public struct BridgeStatusService {
             inspection: inspection,
             attributes: attributes,
             txtRecords: txtRecords,
-            exposureMode: configuration.exposureMode
+            exposureMode: exposureMode
         )
 
         return AirPrintAdvertisementPlan(
@@ -267,18 +372,21 @@ public struct BridgeStatusService {
             resourcePath: resourcePath,
             printerURI: printerURI,
             backingQueueName: inspection.summary.name,
-            exposureMode: configuration.exposureMode,
+            exposureMode: exposureMode,
             txtRecords: txtRecords,
             warnings: warnings
         )
     }
 
-    private func advertisedPort(for exposureMode: BridgeExposureMode) -> Int {
+    private func advertisedPort(
+        for exposureMode: BridgeExposureMode,
+        managedPrinter: ManagedPrinterConfiguration
+    ) -> Int {
         switch exposureMode {
         case .directCUPS:
             return 631
         case .proxy:
-            return ProjectMetadata.defaultProxyPort
+            return managedPrinter.proxyPort ?? ProjectMetadata.defaultProxyPort
         }
     }
 

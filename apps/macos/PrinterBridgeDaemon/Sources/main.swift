@@ -10,8 +10,8 @@ final class DaemonCoordinator {
     private let timer: DispatchSourceTimer
     private let pollInterval: TimeInterval
 
-    private var activeSession: BridgeRuntimeSession?
-    private var activeAdvertisement: AirPrintAdvertisementPlan?
+    private var activeSessions: [String: BridgeRuntimeSession] = [:]
+    private var activeAdvertisements: [String: AirPrintAdvertisementPlan] = [:]
     private var lastStateSummary: String?
 
     init(
@@ -37,7 +37,7 @@ final class DaemonCoordinator {
 
     func stop() {
         timer.cancel()
-        stopActiveSession()
+        stopAllSessions()
     }
 
     private func reconcile() {
@@ -51,62 +51,78 @@ final class DaemonCoordinator {
             let snapshot = statusService.evaluate(configuration: configuration)
             emitStateTransitionIfNeeded(snapshot: snapshot)
 
-            guard configuration.isEnabled, snapshot.isPublishable, let advertisement = snapshot.advertisement else {
-                stopActiveSession()
-                return
+            let desiredAdvertisements = Dictionary(
+                uniqueKeysWithValues: snapshot.publishableAdvertisements.map { ($0.backingQueueName, $0) }
+            )
+            let activeQueueNames = Set(activeSessions.keys)
+            let desiredQueueNames = Set(desiredAdvertisements.keys)
+
+            for queueName in activeQueueNames.subtracting(desiredQueueNames) {
+                stopSession(forQueueNamed: queueName)
             }
 
-            if let activeSession, activeSession.isRunning, activeAdvertisement == advertisement {
-                return
-            }
+            for (queueName, advertisement) in desiredAdvertisements {
+                if let activeSession = activeSessions[queueName],
+                   activeSession.isRunning,
+                   activeAdvertisements[queueName] == advertisement {
+                    continue
+                }
 
-            stopActiveSession()
-            activeSession = try runtimeService.start(advertisementPlan: advertisement) { chunk in
-                let lines = chunk
-                    .split(separator: "\n", omittingEmptySubsequences: true)
-                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                    .filter { !$0.isEmpty }
+                stopSession(forQueueNamed: queueName)
 
-                for line in lines {
-                    if line.hasPrefix("[proxy]") {
-                        print(line)
-                    } else {
-                        print("[dns-sd] \(line)")
+                let session = try runtimeService.start(advertisementPlan: advertisement) { chunk in
+                    let lines = chunk
+                        .split(separator: "\n", omittingEmptySubsequences: true)
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+
+                    for line in lines {
+                        if line.hasPrefix("[proxy]") {
+                            print(line)
+                        } else {
+                            print("[dns-sd] \(line)")
+                        }
                     }
                 }
+
+                activeSessions[queueName] = session
+                activeAdvertisements[queueName] = advertisement
+                print("Publishing `\(advertisement.serviceName)` at \(advertisement.printerURI).")
             }
-            activeAdvertisement = advertisement
-            print("Publishing `\(advertisement.serviceName)` at \(advertisement.printerURI).")
         } catch {
             let summary = "Failed to load bridge configuration: \(error.localizedDescription)"
             if lastStateSummary != summary {
                 fputs("\(summary)\n", stderr)
                 lastStateSummary = summary
             }
-            stopActiveSession()
+            stopAllSessions()
         }
     }
 
     private func emitStateTransitionIfNeeded(snapshot: BridgeStatusSnapshot) {
         var components = [
-            "state=\(snapshot.activationState.rawValue)",
-            "enabled=\(snapshot.configuration.isEnabled ? "yes" : "no")",
-            "publishable=\(snapshot.isPublishable ? "yes" : "no")",
+            "focused-state=\(snapshot.activationState.rawValue)",
+            "enabled=\(snapshot.enabledPrinterCount)",
+            "live=\(snapshot.livePrinterCount)",
         ]
 
         if let queueName = snapshot.configuration.selectedQueueName {
-            components.append("queue=\(queueName)")
+            components.append("focused-queue=\(queueName)")
         }
 
-        if let advertisement = snapshot.advertisement {
-            components.append("endpoint=\(advertisement.printerURI)")
+        if !snapshot.publishableAdvertisements.isEmpty {
+            let endpoints = snapshot.publishableAdvertisements
+                .map(\.printerURI)
+                .sorted()
+                .joined(separator: ",")
+            components.append("endpoints=\(endpoints)")
         }
 
         if !snapshot.message.isEmpty {
             components.append("message=\(snapshot.message)")
         }
 
-        if let warning = snapshot.advertisement?.warnings.first {
+        if let warning = snapshot.selectedPrinter?.advertisement?.warnings.first {
             components.append("warning=\(warning)")
         }
 
@@ -119,12 +135,17 @@ final class DaemonCoordinator {
         lastStateSummary = summary
     }
 
-    private func stopActiveSession() {
-        if let activeSession {
+    private func stopSession(forQueueNamed queueName: String) {
+        if let activeSession = activeSessions.removeValue(forKey: queueName) {
             _ = activeSession.stop()
         }
-        activeSession = nil
-        activeAdvertisement = nil
+        activeAdvertisements.removeValue(forKey: queueName)
+    }
+
+    private func stopAllSessions() {
+        for queueName in Array(activeSessions.keys) {
+            stopSession(forQueueNamed: queueName)
+        }
     }
 }
 

@@ -36,23 +36,33 @@ func bonjourRegistrationCommandUsesAirPrintSubtypeAndTXTRecords() {
 
 @Test
 func bridgeStatusSnapshotReportsPublishableOnlyWhenReadyAndEnabled() {
+    let advertisement = AirPrintAdvertisementPlan(
+        serviceName: "Hallway Brother",
+        hostName: "test-host.local",
+        port: 631,
+        resourcePath: "/printers/Brother_HL_2170W_series",
+        printerURI: "ipp://test-host.local:631/printers/Brother_HL_2170W_series",
+        backingQueueName: "Brother_HL_2170W_series",
+        exposureMode: .directCUPS,
+        txtRecords: [],
+        warnings: []
+    )
+    let managedPrinter = ManagedPrinterStatus(
+        configuration: ManagedPrinterConfiguration(
+            queueName: "Brother_HL_2170W_series",
+            isEnabled: true,
+            proxyPort: 8631
+        ),
+        inspection: nil,
+        activationState: .ready,
+        message: "Ready",
+        advertisement: advertisement
+    )
     let snapshot = BridgeStatusSnapshot(
         configuration: BridgeConfiguration(isEnabled: true, selectedQueueName: "Brother_HL_2170W_series"),
         availableQueues: [],
-        selectedQueue: nil,
-        activationState: .ready,
-        message: "Ready",
-        advertisement: AirPrintAdvertisementPlan(
-            serviceName: "Hallway Brother",
-            hostName: "test-host.local",
-            port: 631,
-            resourcePath: "/printers/Brother_HL_2170W_series",
-            printerURI: "ipp://test-host.local:631/printers/Brother_HL_2170W_series",
-            backingQueueName: "Brother_HL_2170W_series",
-            exposureMode: .directCUPS,
-            txtRecords: [],
-            warnings: []
-        )
+        managedPrinters: [managedPrinter],
+        selectedPrinter: managedPrinter
     )
 
     #expect(snapshot.isPublishable == true)

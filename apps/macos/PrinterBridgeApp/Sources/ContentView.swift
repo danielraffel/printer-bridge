@@ -39,24 +39,24 @@ struct ContentView: View {
 
             GroupBox {
                 VStack(alignment: .leading, spacing: 12) {
-                    Picker("Printer", selection: selectedQueueBinding) {
-                        if let inventorySnapshot = model.inventorySnapshot, !inventorySnapshot.queues.isEmpty {
-                            ForEach(inventorySnapshot.queues) { queue in
-                                Text(queueDisplayName(queue.name)).tag(Optional(queue.name))
+                    Text("Available Printers")
+                        .font(.headline)
+
+                    if model.printerStatuses.isEmpty {
+                        Text("No printers found on this Mac.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 10) {
+                                ForEach(model.printerStatuses) { printer in
+                                    printerRow(printer)
+                                }
                             }
-                        } else {
-                            Text("No printers found").tag(Optional<String>.none)
+                            .padding(.vertical, 2)
                         }
                     }
-                    .pickerStyle(.menu)
 
                     HStack(spacing: 10) {
-                        Button(model.bridgeConfiguration.isEnabled ? "Disable AirPrint" : "Enable AirPrint") {
-                            model.toggleBridgeEnabled()
-                        }
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(model.inventorySnapshot?.queues.isEmpty ?? true)
-
                         Button("Refresh") {
                             model.loadBridgeState()
                         }
@@ -84,11 +84,14 @@ struct ContentView: View {
                     Text("Print Queue")
                         .font(.headline)
 
-                    if let queueName = model.bridgeConfiguration.selectedQueueName {
-                        Text(queueDisplayName(queueName))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    Picker("Printer", selection: selectedQueueBinding) {
+                        ForEach(model.printerStatuses) { printer in
+                            Text(queueDisplayName(printer.configuration.queueName))
+                                .tag(Optional(printer.configuration.queueName))
+                        }
                     }
+                    .pickerStyle(.menu)
+                    .labelsHidden()
                 }
 
                 Spacer()
@@ -154,6 +157,12 @@ struct ContentView: View {
                     Text(model.statusSummary)
                         .foregroundStyle(.secondary)
 
+                    if model.enabledPrinterCount > 0 {
+                        Text("\(model.livePrinterCount) live of \(model.enabledPrinterCount) enabled")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
                     if let statusDetail = model.statusDetail {
                         Text(statusDetail)
                             .font(.footnote)
@@ -218,7 +227,7 @@ struct ContentView: View {
                 detailRow(title: "Last Bonjour event", value: lastBonjourEvent, monospace: true)
             }
 
-            if let warnings = model.bridgeStatus?.advertisement?.warnings, !warnings.isEmpty {
+            if let warnings = model.focusedPrinterStatus?.advertisement?.warnings, !warnings.isEmpty {
                 Divider()
                 ForEach(warnings, id: \.self) { warning in
                     Label(warning, systemImage: "exclamationmark.triangle")
@@ -259,6 +268,83 @@ struct ContentView: View {
             get: { model.bridgeConfiguration.selectedQueueName },
             set: { model.updateSelectedQueue($0) }
         )
+    }
+
+    private func printerRow(_ printer: ManagedPrinterStatus) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Toggle(
+                isOn: Binding(
+                    get: { printer.configuration.isEnabled },
+                    set: { model.setPrinterEnabled($0, forQueueNamed: printer.configuration.queueName) }
+                )
+            ) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(queueDisplayName(printer.configuration.queueName))
+                        .font(.body.weight(.medium))
+                    Text(printerRowSubtitle(printer))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+
+            Spacer(minLength: 8)
+
+            Text(printer.activationState == .ready && printer.configuration.isEnabled ? "Live" : printerRowStateTitle(printer))
+                .font(.footnote.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(printerRowTint(printer).opacity(0.16))
+                .foregroundStyle(printerRowTint(printer))
+                .clipShape(Capsule())
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(model.bridgeConfiguration.selectedQueueName == printer.configuration.queueName ? Color.accentColor.opacity(0.10) : Color.secondary.opacity(0.08))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(model.bridgeConfiguration.selectedQueueName == printer.configuration.queueName ? Color.accentColor.opacity(0.45) : Color.clear, lineWidth: 1)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onTapGesture {
+            model.updateSelectedQueue(printer.configuration.queueName)
+        }
+    }
+
+    private func printerRowSubtitle(_ printer: ManagedPrinterStatus) -> String {
+        if printer.configuration.isEnabled {
+            return printer.message
+        }
+
+        return printer.inspection?.summary.status.capitalized ?? "Available on this Mac"
+    }
+
+    private func printerRowStateTitle(_ printer: ManagedPrinterStatus) -> String {
+        switch printer.activationState {
+        case .disabled:
+            return "Off"
+        case .ready:
+            return "Ready"
+        case .needsReview:
+            return "Needs Review"
+        case .unavailable:
+            return "Unavailable"
+        }
+    }
+
+    private func printerRowTint(_ printer: ManagedPrinterStatus) -> Color {
+        switch printer.activationState {
+        case .disabled:
+            return .secondary
+        case .ready:
+            return .green
+        case .needsReview:
+            return .orange
+        case .unavailable:
+            return .red
+        }
     }
 
     @ViewBuilder

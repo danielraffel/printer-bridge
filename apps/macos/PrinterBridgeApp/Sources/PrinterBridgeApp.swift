@@ -18,5 +18,27 @@ struct PrinterBridgeApp: App {
                 }
         }
         .windowResizability(.contentSize)
+        .commands {
+            PrinterBridgeCommands()
+        }
+
+        Window("\(ProjectMetadata.appDisplayName) Help", id: "help") {
+            HelpView()
+                .frame(width: 500, height: 560)
+        }
+        .windowResizability(.contentSize)
+    }
+}
+
+private struct PrinterBridgeCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some Commands {
+        CommandGroup(replacing: .help) {
+            Button("\(ProjectMetadata.appDisplayName) Help") {
+                openWindow(id: "help")
+            }
+            .keyboardShortcut("?", modifiers: [.command])
+        }
     }
 }

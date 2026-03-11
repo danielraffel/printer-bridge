@@ -131,8 +131,8 @@ enum PrinterBridgeCLI {
             do {
                 var configuration = try configurationStore.load()
                 let printerName = arguments.dropFirst().first ?? configuration.selectedQueueName ?? ProjectMetadata.primaryTargetPrinter
-                configuration.selectedQueueName = printerName
-                configuration.isEnabled = true
+                configuration.setSelectedQueueName(printerName)
+                configuration.setEnabled(true, forQueueNamed: printerName)
                 configuration.exposureMode = .proxy
                 try configurationStore.save(configuration)
                 print(statusService.renderStatus(configuration: configuration))
@@ -143,7 +143,13 @@ enum PrinterBridgeCLI {
         case "disable":
             do {
                 var configuration = try configurationStore.load()
-                configuration.isEnabled = false
+                if let printerName = arguments.dropFirst().first ?? configuration.selectedQueueName {
+                    configuration.setEnabled(false, forQueueNamed: printerName)
+                } else {
+                    for printer in configuration.printers {
+                        configuration.setEnabled(false, forQueueNamed: printer.queueName)
+                    }
+                }
                 try configurationStore.save(configuration)
                 print(statusService.renderStatus(configuration: configuration))
             } catch {
@@ -159,7 +165,11 @@ enum PrinterBridgeCLI {
 
             do {
                 var configuration = try configurationStore.load()
-                configuration.advertisedNameOverride = nameParts.joined(separator: " ")
+                guard let queueName = configuration.selectedQueueName ?? configuration.printers.first?.queueName else {
+                    fputs("No printer is selected for naming.\n", stderr)
+                    exit(1)
+                }
+                configuration.setAdvertisedNameOverride(nameParts.joined(separator: " "), forQueueNamed: queueName)
                 try configurationStore.save(configuration)
                 print(statusService.renderStatus(configuration: configuration))
             } catch {
@@ -169,7 +179,9 @@ enum PrinterBridgeCLI {
         case "clear-advertised-name":
             do {
                 var configuration = try configurationStore.load()
-                configuration.advertisedNameOverride = nil
+                if let queueName = configuration.selectedQueueName ?? configuration.printers.first?.queueName {
+                    configuration.setAdvertisedNameOverride(nil, forQueueNamed: queueName)
+                }
                 try configurationStore.save(configuration)
                 print(statusService.renderStatus(configuration: configuration))
             } catch {
@@ -226,16 +238,28 @@ enum PrinterBridgeCLI {
             "PrinterBridge configuration",
             "",
             "Summary",
-            "- enabled: \(configuration.isEnabled ? "yes" : "no")",
+            "- focused printer enabled: \(configuration.isEnabled ? "yes" : "no")",
             "- exposure mode: \(configuration.exposureMode.rawValue)",
+            "- managed printers: \(configuration.printers.count)",
         ]
 
         if let selectedQueueName = configuration.selectedQueueName, !selectedQueueName.isEmpty {
-            lines.append("- selected queue: \(selectedQueueName)")
+            lines.append("- focused queue: \(selectedQueueName)")
         }
 
-        if let advertisedNameOverride = configuration.advertisedNameOverride, !advertisedNameOverride.isEmpty {
-            lines.append("- advertised name override: \(advertisedNameOverride)")
+        if !configuration.printers.isEmpty {
+            lines.append("")
+            lines.append("Managed Printers")
+            for printer in configuration.printers {
+                var printerLine = "- \(printer.queueName): \(printer.isEnabled ? "enabled" : "disabled")"
+                if let proxyPort = printer.proxyPort {
+                    printerLine += " [port \(proxyPort)]"
+                }
+                lines.append(printerLine)
+                if let override = printer.advertisedNameOverride, !override.isEmpty {
+                    lines.append("  name override: \(override)")
+                }
+            }
         }
 
         return lines.joined(separator: "\n")
@@ -296,8 +320,9 @@ enum PrinterBridgeCLI {
         printerNameOverride: String?
     ) -> BridgeConfiguration {
         var configuration = configuration
-        configuration.isEnabled = true
-        configuration.selectedQueueName = printerNameOverride ?? configuration.selectedQueueName ?? ProjectMetadata.primaryTargetPrinter
+        let queueName = printerNameOverride ?? configuration.selectedQueueName ?? ProjectMetadata.primaryTargetPrinter
+        configuration.setSelectedQueueName(queueName)
+        configuration.setEnabled(true, forQueueNamed: queueName)
         return configuration
     }
 
