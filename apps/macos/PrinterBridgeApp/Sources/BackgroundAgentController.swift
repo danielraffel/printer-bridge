@@ -177,7 +177,7 @@ struct BackgroundAgentController {
             throw BackgroundAgentError.missingResourceDirectory
         }
 
-        return resourceURL.appendingPathComponent("PrinterBridgeDaemon", isDirectory: false)
+        return resourceURL.appendingPathComponent(ProjectMetadata.backgroundAgentExecutableName, isDirectory: false)
     }
 
     private func bundledLaunchAgentPlistURL(bundle: Bundle = .main) throws -> URL {
@@ -211,7 +211,7 @@ enum BackgroundAgentError: LocalizedError {
         case .missingResourceDirectory:
             return "The app bundle is missing its resources directory."
         case let .missingBundledDaemon(path):
-            return "PrinterBridgeDaemon was not found inside the app bundle at \(path)."
+            return "\(ProjectMetadata.appDisplayName) could not find its background service inside the app bundle at \(path)."
         case let .missingBundledLaunchAgent(path):
             return "The bundled background agent plist was not found at \(path)."
         case let .commandFailed(command, output):

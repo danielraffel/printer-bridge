@@ -49,12 +49,14 @@ struct HelpView: View {
                     Text("Open Source")
                         .font(.headline)
 
-                    Text("Source code is available on GitHub. PRs are welcome, and you can use the issue templates there for bug reports and feature requests.")
+                    Text("Source code is available on GitHub, along with the project's terms, privacy policy, bug reporting, and feature request templates.")
                         .foregroundStyle(.secondary)
 
                     Link("View Source on GitHub", destination: URL(string: ProjectMetadata.repositoryURL)!)
                     Link("Report a Bug", destination: URL(string: ProjectMetadata.bugReportURL)!)
                     Link("Request a Feature", destination: URL(string: ProjectMetadata.featureRequestURL)!)
+                    Link("Privacy Policy", destination: URL(string: ProjectMetadata.privacyURL)!)
+                    Link("Terms", destination: URL(string: ProjectMetadata.termsURL)!)
                 }
             }
             .padding(20)

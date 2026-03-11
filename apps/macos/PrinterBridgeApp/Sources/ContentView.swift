@@ -34,19 +34,19 @@ struct ContentView: View {
     }
 
     private var printersTab: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            statusCard
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                statusCard
 
-            GroupBox {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Available Printers")
-                        .font(.headline)
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Available Printers")
+                            .font(.headline)
 
-                    if model.printerStatuses.isEmpty {
-                        Text("No printers are available. Add a printer in System Settings to see it here.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ScrollView {
+                        if model.printerStatuses.isEmpty {
+                            Text("No printers are available. Add a printer in System Settings to see it here.")
+                                .foregroundStyle(.secondary)
+                        } else {
                             VStack(spacing: 10) {
                                 ForEach(model.printerStatuses) { printer in
                                     printerRow(printer)
@@ -54,26 +54,25 @@ struct ContentView: View {
                             }
                             .padding(.vertical, 2)
                         }
-                    }
 
-                    HStack(spacing: 10) {
-                        Button("Refresh") {
-                            model.loadBridgeState()
+                        HStack(spacing: 10) {
+                            Button("Refresh") {
+                                model.loadBridgeState()
+                            }
+
+                            Spacer()
                         }
-
-                        Spacer()
                     }
                 }
-            }
 
-            DisclosureGroup("Advanced") {
-                advancedSection
-                    .padding(.top, 12)
+                DisclosureGroup("Advanced") {
+                    advancedSection
+                        .padding(.top, 12)
+                }
             }
-
-            Spacer(minLength: 0)
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 

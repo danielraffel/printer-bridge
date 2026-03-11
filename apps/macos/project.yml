@@ -23,10 +23,14 @@ targets:
       - path: PrinterBridgeApp/Sources
       - path: PrinterBridgeApp/Resources
         buildPhase: resources
+      - path: ../../docs/legal
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.danielraffel.printerbridge
-        PRODUCT_NAME: PrinterBridge
+        PRODUCT_NAME: "Printer Bridge"
+        EXECUTABLE_NAME: PrinterBridge
+        WRAPPER_NAME: "Printer Bridge.app"
         GENERATE_INFOPLIST_FILE: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: "Printer Bridge"
@@ -46,7 +50,8 @@ targets:
       - path: PrinterBridgeDaemon/Sources
     settings:
       base:
-        PRODUCT_NAME: PrinterBridgeDaemon
+        PRODUCT_NAME: "Printer Bridge Daemon"
+        EXECUTABLE_NAME: "Printer Bridge Daemon"
         SKIP_INSTALL: YES
     dependencies:
       - package: PrinterBridgeCore
