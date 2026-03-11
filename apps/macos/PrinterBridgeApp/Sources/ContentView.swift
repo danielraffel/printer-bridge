@@ -105,7 +105,7 @@ struct ContentView: View {
                 Button("Clear Recent") {
                     model.clearRecentJobs()
                 }
-                .disabled(model.recentCompletedJobs.isEmpty)
+                .disabled(model.recentCompletedJobs.isEmpty || !model.jobSnapshot.activeJobs.isEmpty)
             }
 
             List {
@@ -126,9 +126,7 @@ struct ContentView: View {
                         emptyJobsRow("No recent jobs.")
                     } else {
                         ForEach(model.recentCompletedJobs) { job in
-                            jobRow(job, stateLabel: "Completed") {
-                                model.clearRecentJob(job)
-                            }
+                            jobRow(job, stateLabel: "Completed")
                         }
                     }
                 }
@@ -264,7 +262,7 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func jobRow(_ job: PrintJob, stateLabel: String, action: @escaping () -> Void) -> some View {
+    private func jobRow(_ job: PrintJob, stateLabel: String, action: (() -> Void)? = nil) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: stateLabel == "Printing" ? "printer.fill" : "checkmark.circle.fill")
                 .foregroundStyle(stateLabel == "Printing" ? .blue : .green)
@@ -290,11 +288,13 @@ struct ContentView: View {
                 }
             }
 
-            Button(action: action) {
-                Image(systemName: stateLabel == "Printing" ? "xmark.circle" : "trash")
+            if let action {
+                Button(action: action) {
+                    Image(systemName: "xmark.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Cancel job")
             }
-            .buttonStyle(.borderless)
-            .help(stateLabel == "Printing" ? "Cancel job" : "Clear from recent jobs")
         }
         .padding(.vertical, 2)
     }

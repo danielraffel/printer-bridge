@@ -87,25 +87,13 @@ public struct PrintJobQueueService {
     }
 
     @discardableResult
-    public func purgeCompletedJob(_ job: PrintJob) -> Bool {
-        guard job.state == .completed else {
+    public func purgeAllJobs(forQueueNamed queueName: String?) -> Bool {
+        guard let queueName, !queueName.isEmpty else {
             return false
         }
 
-        let result = runner.run(executable: SystemTool.cancel.path, arguments: ["-x", job.id])
+        let result = runner.run(executable: SystemTool.cancel.path, arguments: ["-a", "-x", queueName])
         return result.exitCode == 0
-    }
-
-    @discardableResult
-    public func purgeCompletedJobs(_ jobs: [PrintJob]) -> Bool {
-        let completedJobs = jobs.filter { $0.state == .completed }
-        guard !completedJobs.isEmpty else {
-            return false
-        }
-
-        return completedJobs
-            .map { purgeCompletedJob($0) }
-            .allSatisfy { $0 }
     }
 
     private func parseJobs(

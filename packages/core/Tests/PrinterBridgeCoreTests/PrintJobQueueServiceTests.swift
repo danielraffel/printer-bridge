@@ -44,7 +44,7 @@ func printJobSnapshotParsesActiveAndCompletedJobs() {
 }
 
 @Test
-func printJobQueueServiceSupportsCancelAndPurgeOperations() {
+func printJobQueueServiceSupportsCancelAndQueuePurgeOperations() {
     let runner = RecordingJobCommandRunner()
     let service = PrintJobQueueService(runner: runner)
 
@@ -58,24 +58,11 @@ func printJobQueueServiceSupportsCancelAndPurgeOperations() {
         state: .active,
         rawLine: ""
     )
-    let completedJob = PrintJob(
-        id: "Brother_HL_2170W_series-500",
-        queueName: "Brother_HL_2170W_series",
-        jobNumber: 500,
-        owner: "mobile",
-        sizeBytes: 2048,
-        submittedAt: "Tue Mar 10 17:52:00 2026",
-        state: .completed,
-        rawLine: ""
-    )
-
     #expect(service.cancelActiveJob(activeJob))
-    #expect(service.purgeCompletedJob(completedJob))
-    #expect(service.purgeCompletedJobs([completedJob]))
+    #expect(service.purgeAllJobs(forQueueNamed: "Brother_HL_2170W_series"))
     #expect(runner.commands == [
         "/usr/bin/cancel Brother_HL_2170W_series-501",
-        "/usr/bin/cancel -x Brother_HL_2170W_series-500",
-        "/usr/bin/cancel -x Brother_HL_2170W_series-500",
+        "/usr/bin/cancel -a -x Brother_HL_2170W_series",
     ])
 }
 

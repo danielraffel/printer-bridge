@@ -248,20 +248,16 @@ final class PrinterBridgeViewModel: ObservableObject {
             return
         }
 
+        guard jobSnapshot.activeJobs.isEmpty else {
+            jobsMessage = "Clear Recent is only available when there are no active jobs."
+            return
+        }
+
         performJobsOperation(
             successMessage: "Cleared recent jobs.",
             failureMessage: "Could not clear recent jobs."
-        ) { [jobs = recentCompletedJobs] in
-            PrintJobQueueService().purgeCompletedJobs(jobs)
-        }
-    }
-
-    func clearRecentJob(_ job: PrintJob) {
-        performJobsOperation(
-            successMessage: "Cleared \(job.id) from recent jobs.",
-            failureMessage: "Could not clear \(job.id)."
-        ) {
-            PrintJobQueueService().purgeCompletedJob(job)
+        ) { [queueName = bridgeConfiguration.selectedQueueName] in
+            PrintJobQueueService().purgeAllJobs(forQueueNamed: queueName)
         }
     }
 
