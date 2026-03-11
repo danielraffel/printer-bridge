@@ -177,8 +177,7 @@ func bridgeStatusUsesHostDisplayNameWhenNoOverrideIsSet() {
     let statusService = BridgeStatusService(
         inventoryService: inventoryService,
         attributeService: attributeService,
-        hostNameProvider: { "test-host.local" },
-        displayNameProvider: { "Daniel’s Mac mini" }
+        hostNameProvider: { "test-host.local" }
     )
     let configuration = BridgeConfiguration(
         isEnabled: true,
@@ -189,5 +188,5 @@ func bridgeStatusUsesHostDisplayNameWhenNoOverrideIsSet() {
 
     let snapshot = statusService.evaluate(configuration: configuration)
 
-    #expect(snapshot.advertisement?.serviceName == "Brother HL-2170W series @ Daniel’s Mac mini")
+    #expect(snapshot.advertisement?.serviceName == "Brother HL-2170W series via PrinterBridge")
 }

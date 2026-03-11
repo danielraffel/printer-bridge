@@ -85,18 +85,15 @@ public struct BridgeStatusService {
     private let inventoryService: PrinterInventoryService
     private let attributeService: IPPPrinterAttributeService
     private let hostNameProvider: () -> String
-    private let displayNameProvider: () -> String
 
     public init(
         inventoryService: PrinterInventoryService = PrinterInventoryService(),
         attributeService: IPPPrinterAttributeService = IPPPrinterAttributeService(),
-        hostNameProvider: @escaping () -> String = { BridgeStatusService.defaultHostName() },
-        displayNameProvider: @escaping () -> String = { BridgeStatusService.defaultDisplayName() }
+        hostNameProvider: @escaping () -> String = { BridgeStatusService.defaultHostName() }
     ) {
         self.inventoryService = inventoryService
         self.attributeService = attributeService
         self.hostNameProvider = hostNameProvider
-        self.displayNameProvider = displayNameProvider
     }
 
     public func evaluate(configuration: BridgeConfiguration) -> BridgeStatusSnapshot {
@@ -242,7 +239,7 @@ public struct BridgeStatusService {
         let baseServiceName = inspection.detail.description
             ?? inspection.summary.name.replacingOccurrences(of: "_", with: " ")
         let serviceName = configuration.advertisedNameOverride
-            ?? "\(baseServiceName) @ \(displayNameProvider())"
+            ?? "\(baseServiceName) via \(ProjectMetadata.productName)"
 
         let encodedQueueName = inspection.summary.name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed)
             ?? inspection.summary.name
@@ -417,27 +414,6 @@ public struct BridgeStatusService {
             hostCurrentName: Host.current().name,
             processHostName: ProcessInfo.processInfo.hostName
         )
-    }
-
-    public static func defaultDisplayName() -> String {
-        var encoding = CFStringEncoding(0)
-        if let computerName = SCDynamicStoreCopyComputerName(nil, &encoding) as String? {
-            let trimmed = computerName.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty {
-                return trimmed
-            }
-        }
-
-        if let localizedName = Host.current().localizedName?.trimmingCharacters(in: .whitespacesAndNewlines), !localizedName.isEmpty {
-            return localizedName
-        }
-
-        let hostName = defaultHostName()
-        if let normalized = normalizeBonjourHostName(hostName, requireLocalIdentity: false) {
-            return normalized.replacingOccurrences(of: ".local", with: "")
-        }
-
-        return "This Mac"
     }
 
     static func preferredBonjourHostName(
