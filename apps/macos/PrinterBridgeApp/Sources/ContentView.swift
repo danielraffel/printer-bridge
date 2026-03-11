@@ -10,6 +10,8 @@ struct ContentView: View {
     }
 
     @ObservedObject var model: PrinterBridgeViewModel
+    @Binding var appearanceMode: AppAppearanceMode
+    let appearanceRefreshToken: UUID
 
     @State private var selectedTab: Tab = .printers
 
@@ -27,6 +29,7 @@ struct ContentView: View {
                 }
                 .tag(Tab.jobs)
         }
+        .id(appearanceRefreshToken)
         .frame(width: 560, height: 470)
         .task {
             model.loadBridgeState(forceBackgroundSync: true)
@@ -192,6 +195,17 @@ struct ContentView: View {
             )
 
             Text("When enabled, \(ProjectMetadata.appDisplayName) keeps AirPrint available after you close the window.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Picker("Appearance", selection: $appearanceMode) {
+                ForEach(AppAppearanceMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Text("Choose whether \(ProjectMetadata.appDisplayName) follows the system appearance or always uses Light or Dark mode.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
 
@@ -426,5 +440,9 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(model: PrinterBridgeViewModel())
+    ContentView(
+        model: PrinterBridgeViewModel(),
+        appearanceMode: .constant(.system),
+        appearanceRefreshToken: UUID()
+    )
 }
