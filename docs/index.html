@@ -296,6 +296,17 @@
             border: 1px solid var(--border);
         }
 
+        .gallery-trigger {
+            appearance: none;
+            display: block;
+            width: 100%;
+            padding: 0;
+            border: 0;
+            background: transparent;
+            cursor: zoom-in;
+            text-align: inherit;
+        }
+
         .gallery-card img {
             display: block;
             width: 100%;
@@ -305,9 +316,129 @@
             box-shadow: 0 16px 34px rgba(7, 16, 31, 0.18);
         }
 
+        .gallery-trigger:focus-visible {
+            outline: 2px solid rgba(29, 109, 242, 0.45);
+            outline-offset: 4px;
+            border-radius: 20px;
+        }
+
         .gallery-caption {
             font-size: 0.93rem;
             color: var(--muted);
+        }
+
+        .lightbox {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 28px;
+            background: rgba(7, 13, 24, 0.84);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 999;
+        }
+
+        .lightbox.is-open {
+            display: flex;
+        }
+
+        .lightbox-backdrop {
+            position: absolute;
+            inset: 0;
+            border: 0;
+            background: transparent;
+            cursor: zoom-out;
+        }
+
+        .lightbox-panel {
+            position: relative;
+            width: min(1120px, 100%);
+            display: grid;
+            justify-items: center;
+            gap: 14px;
+            z-index: 1;
+        }
+
+        .lightbox-frame {
+            position: relative;
+            width: min(100%, 980px);
+            max-height: calc(100vh - 140px);
+            padding: 20px;
+            border-radius: 28px;
+            background: rgba(10, 18, 33, 0.82);
+            border: 1px solid rgba(161, 178, 212, 0.18);
+            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.42);
+        }
+
+        .lightbox-image {
+            display: block;
+            width: 100%;
+            max-height: calc(100vh - 180px);
+            object-fit: contain;
+            margin: 0 auto;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .lightbox-caption {
+            max-width: 860px;
+            text-align: center;
+            color: #e8efff;
+            font-size: 0.98rem;
+        }
+
+        .lightbox-close,
+        .lightbox-nav {
+            appearance: none;
+            border: 0;
+            cursor: pointer;
+            color: #ffffff;
+            background: rgba(10, 18, 33, 0.8);
+            border: 1px solid rgba(161, 178, 212, 0.18);
+            box-shadow: 0 16px 28px rgba(0, 0, 0, 0.18);
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            font-size: 1.4rem;
+            line-height: 1;
+        }
+
+        .lightbox-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 48px;
+            height: 48px;
+            border-radius: 999px;
+            font-size: 1.6rem;
+            line-height: 1;
+        }
+
+        .lightbox-nav-prev {
+            left: 14px;
+        }
+
+        .lightbox-nav-next {
+            right: 14px;
+        }
+
+        .lightbox-close:hover,
+        .lightbox-nav:hover {
+            background: rgba(22, 36, 64, 0.95);
+        }
+
+        .lightbox-close:focus-visible,
+        .lightbox-nav:focus-visible {
+            outline: 2px solid rgba(93, 155, 255, 0.65);
+            outline-offset: 3px;
         }
 
         .features {
@@ -413,6 +544,33 @@
             .section-card {
                 padding: 22px;
             }
+
+            .lightbox {
+                padding: 14px;
+            }
+
+            .lightbox-frame {
+                padding: 16px;
+                max-height: calc(100vh - 90px);
+            }
+
+            .lightbox-image {
+                max-height: calc(100vh - 150px);
+            }
+
+            .lightbox-nav {
+                width: 42px;
+                height: 42px;
+                font-size: 1.35rem;
+            }
+
+            .lightbox-nav-prev {
+                left: 8px;
+            }
+
+            .lightbox-nav-next {
+                right: 8px;
+            }
         }
     </style>
 </head>
@@ -444,19 +602,27 @@
                 </div>
                 <div class="gallery">
                     <figure class="gallery-card">
-                        <img src="./assets/gallery/printers-dark.png" alt="Printer Bridge printers view in dark mode">
+                        <button class="gallery-trigger" type="button" data-gallery-index="0" aria-label="Open focused printer screenshot">
+                            <img src="./assets/gallery/printers-dark.png" alt="Printer Bridge printers view in dark mode">
+                        </button>
                         <figcaption class="gallery-caption">A focused printer view with quick AirPrint controls and live AirPrint status.</figcaption>
                     </figure>
                     <figure class="gallery-card">
-                        <img src="./assets/gallery/printers-dark-jobs.png" alt="Printer Bridge jobs view in dark mode">
+                        <button class="gallery-trigger" type="button" data-gallery-index="1" aria-label="Open jobs screenshot">
+                            <img src="./assets/gallery/printers-dark-jobs.png" alt="Printer Bridge jobs view in dark mode">
+                        </button>
                         <figcaption class="gallery-caption">Check recent print jobs and queue activity from the same app.</figcaption>
                     </figure>
                     <figure class="gallery-card">
-                        <img src="./assets/gallery/printers-daemon.png" alt="Printer Bridge background sharing status">
+                        <button class="gallery-trigger" type="button" data-gallery-index="2" aria-label="Open background sharing screenshot">
+                            <img src="./assets/gallery/printers-daemon.png" alt="Printer Bridge background sharing status">
+                        </button>
                         <figcaption class="gallery-caption">Background sharing keeps AirPrint available even after setup is done.</figcaption>
                     </figure>
                     <figure class="gallery-card">
-                        <img src="./assets/gallery/airprint-iphone.png" alt="iPhone printing to a printer shared by Printer Bridge">
+                        <button class="gallery-trigger" type="button" data-gallery-index="3" aria-label="Open iPhone AirPrint screenshot">
+                            <img src="./assets/gallery/airprint-iphone.png" alt="iPhone printing to a printer shared by Printer Bridge">
+                        </button>
                         <figcaption class="gallery-caption">Print from iPhone and other AirPrint devices through a printer shared by Printer Bridge.</figcaption>
                     </figure>
                 </div>
@@ -567,5 +733,137 @@
             </div>
         </footer>
     </div>
+    <div class="lightbox" id="gallery-lightbox" aria-hidden="true">
+        <button class="lightbox-backdrop" type="button" id="gallery-lightbox-backdrop" aria-label="Close screenshot viewer"></button>
+        <div class="lightbox-panel" role="dialog" aria-modal="true" aria-label="Printer Bridge screenshots">
+            <div class="lightbox-frame">
+                <button class="lightbox-close" type="button" id="gallery-lightbox-close" aria-label="Close screenshot viewer">×</button>
+                <button class="lightbox-nav lightbox-nav-prev" type="button" id="gallery-lightbox-prev" aria-label="Previous screenshot">‹</button>
+                <img class="lightbox-image" id="gallery-lightbox-image" src="" alt="">
+                <button class="lightbox-nav lightbox-nav-next" type="button" id="gallery-lightbox-next" aria-label="Next screenshot">›</button>
+            </div>
+            <div class="lightbox-caption" id="gallery-lightbox-caption"></div>
+        </div>
+    </div>
+    <script>
+        (() => {
+            const galleryButtons = Array.from(document.querySelectorAll(".gallery-trigger"));
+            const lightbox = document.getElementById("gallery-lightbox");
+            const lightboxImage = document.getElementById("gallery-lightbox-image");
+            const lightboxCaption = document.getElementById("gallery-lightbox-caption");
+            const previousButton = document.getElementById("gallery-lightbox-prev");
+            const nextButton = document.getElementById("gallery-lightbox-next");
+            const closeButton = document.getElementById("gallery-lightbox-close");
+            const backdropButton = document.getElementById("gallery-lightbox-backdrop");
+
+            if (!galleryButtons.length || !lightbox || !lightboxImage || !lightboxCaption || !previousButton || !nextButton || !closeButton || !backdropButton) {
+                return;
+            }
+
+            const galleryItems = galleryButtons.map((button) => {
+                const image = button.querySelector("img");
+                const caption = button.parentElement?.querySelector(".gallery-caption");
+
+                return {
+                    src: image?.getAttribute("src") ?? "",
+                    alt: image?.getAttribute("alt") ?? "",
+                    caption: caption?.textContent?.trim() ?? ""
+                };
+            });
+
+            let activeIndex = 0;
+            let lastTrigger = null;
+            let touchStartX = 0;
+
+            const renderLightbox = () => {
+                const item = galleryItems[activeIndex];
+                if (!item) {
+                    return;
+                }
+
+                lightboxImage.src = item.src;
+                lightboxImage.alt = item.alt;
+                lightboxCaption.textContent = item.caption;
+            };
+
+            const openLightbox = (index, trigger) => {
+                activeIndex = index;
+                lastTrigger = trigger ?? null;
+                renderLightbox();
+                lightbox.classList.add("is-open");
+                lightbox.setAttribute("aria-hidden", "false");
+                document.body.style.overflow = "hidden";
+                closeButton.focus();
+            };
+
+            const closeLightbox = () => {
+                lightbox.classList.remove("is-open");
+                lightbox.setAttribute("aria-hidden", "true");
+                document.body.style.overflow = "";
+                lightboxImage.removeAttribute("src");
+                if (lastTrigger instanceof HTMLElement) {
+                    lastTrigger.focus();
+                }
+            };
+
+            const showPrevious = () => {
+                activeIndex = (activeIndex - 1 + galleryItems.length) % galleryItems.length;
+                renderLightbox();
+            };
+
+            const showNext = () => {
+                activeIndex = (activeIndex + 1) % galleryItems.length;
+                renderLightbox();
+            };
+
+            galleryButtons.forEach((button, index) => {
+                button.addEventListener("click", () => openLightbox(index, button));
+            });
+
+            previousButton.addEventListener("click", showPrevious);
+            nextButton.addEventListener("click", showNext);
+            closeButton.addEventListener("click", closeLightbox);
+            backdropButton.addEventListener("click", closeLightbox);
+
+            lightbox.addEventListener("click", (event) => {
+                if (event.target === lightbox) {
+                    closeLightbox();
+                }
+            });
+
+            lightbox.addEventListener("touchstart", (event) => {
+                touchStartX = event.changedTouches[0]?.clientX ?? 0;
+            }, { passive: true });
+
+            lightbox.addEventListener("touchend", (event) => {
+                const touchEndX = event.changedTouches[0]?.clientX ?? 0;
+                const delta = touchEndX - touchStartX;
+
+                if (Math.abs(delta) < 40) {
+                    return;
+                }
+
+                if (delta > 0) {
+                    showPrevious();
+                } else {
+                    showNext();
+                }
+            }, { passive: true });
+
+            document.addEventListener("keydown", (event) => {
+                if (!lightbox.classList.contains("is-open")) {
+                    return;
+                }
+
+                if (event.key === "Escape") {
+                    closeLightbox();
+                } else if (event.key === "ArrowLeft") {
+                    showPrevious();
+                } else if (event.key === "ArrowRight") {
+                    showNext();
+                }
+            });
+        })();
+    </script>
 </body>
 </html>
