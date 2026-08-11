@@ -119,15 +119,24 @@ if [ -n "$SIGNING_IDENTITY" ]; then
 fi
 
 if [ "${PRINTERBRIDGE_SKIP_NOTARIZATION:-0}" != "1" ]; then
-  require_env APPLE_ID
-  require_env TEAM_ID
-  require_env APP_SPECIFIC_PASSWORD
-
-  xcrun notarytool submit "$OUTPUT_DMG" \
-    --apple-id "$APPLE_ID" \
-    --team-id "$TEAM_ID" \
-    --password "$APP_SPECIFIC_PASSWORD" \
-    --wait
+  if [ -n "${PULP_NOTARY_KEY_PATH:-}" ]; then
+    require_env PULP_NOTARY_KEY_ID
+    require_env PULP_NOTARY_ISSUER_ID
+    xcrun notarytool submit "$OUTPUT_DMG" \
+      --key "$PULP_NOTARY_KEY_PATH" \
+      --key-id "$PULP_NOTARY_KEY_ID" \
+      --issuer "$PULP_NOTARY_ISSUER_ID" \
+      --wait
+  else
+    require_env APPLE_ID
+    require_env TEAM_ID
+    require_env APP_SPECIFIC_PASSWORD
+    xcrun notarytool submit "$OUTPUT_DMG" \
+      --apple-id "$APPLE_ID" \
+      --team-id "$TEAM_ID" \
+      --password "$APP_SPECIFIC_PASSWORD" \
+      --wait
+  fi
 
   xcrun stapler staple "$OUTPUT_DMG"
 fi

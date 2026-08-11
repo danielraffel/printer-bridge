@@ -129,15 +129,24 @@ productbuild \
   "$OUTPUT_PKG"
 
 if [ "${PRINTERBRIDGE_SKIP_NOTARIZATION:-0}" != "1" ]; then
-  require_env APPLE_ID
-  require_env TEAM_ID
-  require_env APP_SPECIFIC_PASSWORD
-
-  xcrun notarytool submit "$OUTPUT_PKG" \
-    --apple-id "$APPLE_ID" \
-    --team-id "$TEAM_ID" \
-    --password "$APP_SPECIFIC_PASSWORD" \
-    --wait
+  if [ -n "${PULP_NOTARY_KEY_PATH:-}" ]; then
+    require_env PULP_NOTARY_KEY_ID
+    require_env PULP_NOTARY_ISSUER_ID
+    xcrun notarytool submit "$OUTPUT_PKG" \
+      --key "$PULP_NOTARY_KEY_PATH" \
+      --key-id "$PULP_NOTARY_KEY_ID" \
+      --issuer "$PULP_NOTARY_ISSUER_ID" \
+      --wait
+  else
+    require_env APPLE_ID
+    require_env TEAM_ID
+    require_env APP_SPECIFIC_PASSWORD
+    xcrun notarytool submit "$OUTPUT_PKG" \
+      --apple-id "$APPLE_ID" \
+      --team-id "$TEAM_ID" \
+      --password "$APP_SPECIFIC_PASSWORD" \
+      --wait
+  fi
 
   xcrun stapler staple "$OUTPUT_PKG"
 fi
