@@ -39,10 +39,11 @@ struct BackgroundAgentController {
         let service = serviceReference()
         switch service.status {
         case .enabled:
-            if forceRestart {
-                return restartRegisteredAgent()
+            let currentState = launchdEnabledState()
+            if forceRestart || currentState == .stopped {
+                return try restartRegisteredAgent(service: service)
             }
-            return launchdEnabledState()
+            return currentState
         case .requiresApproval:
             return .requiresApproval
         case .notFound, .notRegistered:
@@ -59,7 +60,7 @@ struct BackgroundAgentController {
             }
 
             if forceRestart {
-                return restartRegisteredAgent()
+                return try restartRegisteredAgent(service: service)
             }
 
             return mapServiceStatus(service.status)
@@ -119,7 +120,7 @@ struct BackgroundAgentController {
         )
 
         guard result.exitCode == 0 else {
-            return .loaded
+            return .stopped
         }
 
         let output = result.combinedOutput
@@ -133,14 +134,48 @@ struct BackgroundAgentController {
         return .loaded
     }
 
-    private func restartRegisteredAgent() -> BackgroundAgentState {
+    private func restartRegisteredAgent(service: SMAppService) throws -> BackgroundAgentState {
         let kickstartResult = runner.run(
             executable: SystemTool.launchctl.path,
             arguments: ["kickstart", "-k", serviceTarget]
         )
 
-        if kickstartResult.exitCode != 0 {
-            return mapServiceStatus(serviceReference().status)
+        if kickstartResult.exitCode == 0 {
+            return launchdEnabledState()
+        }
+
+        // SMAppService can retain an enabled registration across an app upgrade
+        // even when launchd no longer has the corresponding job. Re-registering
+        // refreshes the bundled plist and executable association.
+        do {
+            try service.unregister()
+        } catch {
+            if service.status != .notRegistered && service.status != .notFound {
+                throw BackgroundAgentError.commandFailed("SMAppService.unregister()", error.localizedDescription)
+            }
+        }
+
+        do {
+            try service.register()
+        } catch {
+            let currentState = mapServiceStatus(service.status)
+            if currentState != .running && currentState != .loaded && currentState != .requiresApproval {
+                throw BackgroundAgentError.commandFailed("SMAppService.register()", error.localizedDescription)
+            }
+            return currentState
+        }
+
+        let registeredState = mapServiceStatus(service.status)
+        guard registeredState == .running || registeredState == .loaded else {
+            return registeredState
+        }
+
+        let registeredKickstartResult = runner.run(
+            executable: SystemTool.launchctl.path,
+            arguments: ["kickstart", "-k", serviceTarget]
+        )
+        guard registeredKickstartResult.exitCode == 0 else {
+            return launchdEnabledState()
         }
 
         return launchdEnabledState()
