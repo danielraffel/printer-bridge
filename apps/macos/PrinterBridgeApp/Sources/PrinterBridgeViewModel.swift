@@ -195,7 +195,7 @@ final class PrinterBridgeViewModel: ObservableObject {
 
             let shouldSyncBackground = forceBackgroundSync || (configuration.keepRunningInBackground && !hasSynchronizedBackgroundAgent)
             refreshTask = Task {
-                let payload = await Task.detached(priority: .userInitiated) {
+                let payload = await Task.detached(priority: .userInitiated) { @Sendable [configuration] in
                     Self.buildRefreshPayload(configuration: configuration)
                 }.value
 
@@ -335,7 +335,7 @@ final class PrinterBridgeViewModel: ObservableObject {
 
         refreshTask = Task {
             do {
-                let payload = try await Task.detached(priority: .userInitiated) {
+                let payload = try await Task.detached(priority: .userInitiated) { @Sendable [configurationToSave, configURL] in
                     var normalizedConfiguration = configurationToSave
                     normalizedConfiguration.exposureMode = .proxy
                     normalizedConfiguration.normalize()
