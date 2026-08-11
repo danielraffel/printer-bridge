@@ -168,7 +168,10 @@ public struct ProxyAirPrintServer {
             throw ProxyAirPrintError.invalidPort(advertisementPlan.port)
         }
 
-        let queue = DispatchQueue(label: "com.danielraffel.printerbridge.proxy", qos: .userInitiated)
+        let queue = DispatchQueue(
+            label: "com.danielraffel.printerbridge.proxy",
+            qos: .userInitiated
+        )
         let handler = ProxyAirPrintRequestHandler(
             advertisementPlan: advertisementPlan,
             inventoryService: inventoryService,
@@ -396,12 +399,19 @@ private final class ProxyAirPrintServerState: @unchecked Sendable {
 }
 
 private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
+    private struct CapabilitySnapshot {
+        let attributes: IPPPrinterAttributesSnapshot?
+        let inspection: PrinterQueueInspection?
+    }
+
     private let advertisementPlan: AirPrintAdvertisementPlan
     private let inventoryService: PrinterInventoryService
     private let attributeService: IPPPrinterAttributeService
     private let jobQueueService: PrintJobQueueService
     private let submissionService: PrintJobSubmissionService
     private let outputHandler: (@Sendable (String) -> Void)?
+    private let capabilityLock = NSLock()
+    private var cachedCapabilities: CapabilitySnapshot?
 
     init(
         advertisementPlan: AirPrintAdvertisementPlan,
@@ -417,6 +427,12 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
         self.jobQueueService = jobQueueService
         self.submissionService = submissionService
         self.outputHandler = outputHandler
+        if advertisementPlan.prefetchedAttributes != nil || advertisementPlan.prefetchedInspection != nil {
+            cachedCapabilities = CapabilitySnapshot(
+                attributes: advertisementPlan.prefetchedAttributes,
+                inspection: advertisementPlan.prefetchedInspection
+            )
+        }
     }
 
     func handle(connection: NWConnection, on queue: DispatchQueue) {
@@ -453,15 +469,26 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
 
             if assembler.shouldSendContinue {
                 assembler.markContinueSent()
-                self.sendRawHTTPResponse(statusCode: 100, reasonPhrase: "Continue", body: Data(), on: connection) {
-                    self.receiveNextChunk(on: connection, assembler: assembler, queue: queue)
+                self.sendRawHTTPResponse(
+                    statusCode: 100,
+                    reasonPhrase: "Continue",
+                    body: Data(),
+                    isFinal: false,
+                    on: connection
+                ) {
+                    if let request = assembler.takeRequest() {
+                        let response = self.handle(request: request)
+                        self.send(response: response, on: connection, queue: queue)
+                    } else {
+                        self.receiveNextChunk(on: connection, assembler: assembler, queue: queue)
+                    }
                 }
                 return
             }
 
             if let request = assembler.takeRequest() {
                 let response = self.handle(request: request)
-                self.send(response: response, on: connection)
+                self.send(response: response, on: connection, queue: queue)
                 return
             }
 
@@ -503,16 +530,15 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
 
     private func handle(ippRequest: IPPRequest) -> IPPResponse {
         let queueName = advertisementPlan.backingQueueName
-        let attributes = attributeService.fetchAttributes(forQueueNamed: queueName)
-        let inspection = inventoryService.inspectQueue(named: queueName)
 
         switch ippRequest.operationID {
         case .getPrinterAttributes:
             outputHandler?("[proxy] Get-Printer-Attributes for \(queueName)")
+            let capabilities = capabilities(forQueueNamed: queueName)
             return buildPrinterAttributesResponse(
                 request: ippRequest,
-                inspection: inspection,
-                attributes: attributes
+                inspection: capabilities.inspection,
+                attributes: capabilities.attributes
             )
         case .validateJob:
             outputHandler?("[proxy] Validate-Job for \(queueName)")
@@ -560,6 +586,21 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
         }
     }
 
+    private func capabilities(forQueueNamed queueName: String) -> CapabilitySnapshot {
+        capabilityLock.withLock {
+            if let cachedCapabilities {
+                return cachedCapabilities
+            }
+
+            let snapshot = CapabilitySnapshot(
+                attributes: attributeService.fetchAttributes(forQueueNamed: queueName),
+                inspection: inventoryService.inspectQueue(named: queueName)
+            )
+            cachedCapabilities = snapshot
+            return snapshot
+        }
+    }
+
     private func buildPrinterAttributesResponse(
         request: IPPRequest,
         inspection: PrinterQueueInspection?,
@@ -573,7 +614,7 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
             ?? advertisementPlan.serviceName
         let documentFormats = preferredDocumentFormats(from: attributes)
         let supportsColor = attributes?.boolValue(named: "color-supported") ?? false
-        let activeJobs = jobQueueService.snapshot(forQueueNamed: advertisementPlan.backingQueueName).activeJobs.count
+        let activeJobs = attributes?.intValue(named: "queued-job-count") ?? 0
         let state = printerStateValue(from: inspection?.summary.status)
 
         let groups = [
@@ -789,7 +830,11 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
             .flatMap { Int($0) }
     }
 
-    private func send(response: HTTPOutboundResponse, on connection: NWConnection) {
+    private func send(
+        response: HTTPOutboundResponse,
+        on connection: NWConnection,
+        queue: DispatchQueue
+    ) {
         sendRawHTTPResponse(
             statusCode: response.statusCode,
             reasonPhrase: response.reasonPhrase,
@@ -797,7 +842,13 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
             body: response.body,
             on: connection
         ) {
-            connection.cancel()
+            // `contentProcessed` means Network.framework accepted the bytes; it does
+            // not mean the peer has consumed them. Cancelling immediately can turn a
+            // graceful HTTP close into a TCP reset and intermittently discard the IPP
+            // response before AirPrint reads it.
+            queue.asyncAfter(deadline: .now() + 1) {
+                connection.cancel()
+            }
         }
     }
 
@@ -806,14 +857,18 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
         reasonPhrase: String,
         headers: [String: String] = [:],
         body: Data,
+        isFinal: Bool = true,
         on connection: NWConnection,
         completion: @escaping @Sendable () -> Void
     ) {
-        var headerLines = [
-            "HTTP/1.1 \(statusCode) \(reasonPhrase)",
-            "Connection: close",
-        ]
-        if !body.isEmpty {
+        var headerLines = ["HTTP/1.1 \(statusCode) \(reasonPhrase)"]
+        if isFinal {
+            headerLines.append("Connection: close")
+        }
+        let hasContentLength = headers.keys.contains {
+            $0.caseInsensitiveCompare("Content-Length") == .orderedSame
+        }
+        if !body.isEmpty && !hasContentLength {
             headerLines.append("Content-Length: \(body.count)")
         }
         for key in headers.keys.sorted() {
@@ -827,13 +882,24 @@ private final class ProxyAirPrintRequestHandler: @unchecked Sendable {
         var responseData = Data(headerLines.joined(separator: "\r\n").utf8)
         responseData.append(body)
 
-        connection.send(content: responseData, completion: .contentProcessed { _ in
-            completion()
-        })
+        let responseByteCount = responseData.count
+        connection.send(
+            content: responseData,
+            contentContext: .defaultMessage,
+            isComplete: true,
+            completion: .contentProcessed { [outputHandler] error in
+                if let error {
+                    outputHandler?("[proxy] Failed to send HTTP \(statusCode): \(error.localizedDescription)")
+                } else {
+                    outputHandler?("[proxy] Sent HTTP \(statusCode) response (\(responseByteCount) bytes).")
+                }
+                completion()
+            }
+        )
     }
 }
 
-private struct HTTPInboundRequest {
+struct HTTPInboundRequest {
     let method: String
     let path: String
     let headers: [String: String]
@@ -876,7 +942,7 @@ private struct HTTPOutboundResponse {
     }
 }
 
-private final class HTTPRequestAssembler: @unchecked Sendable {
+final class HTTPRequestAssembler: @unchecked Sendable {
     private var buffer = Data()
     private var header: HTTPParsedHeader?
     private var sentContinue = false
@@ -900,6 +966,20 @@ private final class HTTPRequestAssembler: @unchecked Sendable {
     func takeRequest() -> HTTPInboundRequest? {
         guard let header = parsedHeaderIfNeeded() else {
             return nil
+        }
+
+        if header.usesChunkedTransferEncoding {
+            let encodedBody = buffer.subdata(in: header.headerLength..<buffer.count)
+            guard let body = Self.decodeChunkedBody(encodedBody) else {
+                return nil
+            }
+
+            return HTTPInboundRequest(
+                method: header.method,
+                path: header.path,
+                headers: header.headers,
+                body: body
+            )
         }
 
         let totalLength = header.headerLength + header.contentLength
@@ -928,15 +1008,66 @@ private final class HTTPRequestAssembler: @unchecked Sendable {
         header = parsed
         return parsed
     }
+
+    private static func decodeChunkedBody(_ data: Data) -> Data? {
+        let lineEnding = Data("\r\n".utf8)
+        let trailerEnding = Data("\r\n\r\n".utf8)
+        var cursor = 0
+        var decoded = Data()
+
+        while cursor < data.count {
+            guard let sizeLineRange = data.range(of: lineEnding, in: cursor..<data.count),
+                  let sizeLine = String(
+                      data: data.subdata(in: cursor..<sizeLineRange.lowerBound),
+                      encoding: .ascii
+                  ) else {
+                return nil
+            }
+
+            let sizeToken = sizeLine.split(separator: ";", maxSplits: 1)[0]
+                .trimmingCharacters(in: .whitespaces)
+            guard let chunkSize = Int(sizeToken, radix: 16), chunkSize >= 0 else {
+                return nil
+            }
+            cursor = sizeLineRange.upperBound
+
+            if chunkSize == 0 {
+                guard data.count >= cursor + lineEnding.count else {
+                    return nil
+                }
+                if data[cursor] == 0x0D, data[cursor + 1] == 0x0A {
+                    return decoded
+                }
+                guard data.range(of: trailerEnding, in: cursor..<data.count) != nil else {
+                    return nil
+                }
+                return decoded
+            }
+
+            guard chunkSize <= data.count - cursor,
+                  data.count - cursor - chunkSize >= lineEnding.count else {
+                return nil
+            }
+            let chunkEnd = cursor + chunkSize
+            guard data[chunkEnd] == 0x0D, data[chunkEnd + 1] == 0x0A else {
+                return nil
+            }
+            decoded.append(data.subdata(in: cursor..<chunkEnd))
+            cursor = chunkEnd + lineEnding.count
+        }
+
+        return nil
+    }
 }
 
-private struct HTTPParsedHeader {
+struct HTTPParsedHeader {
     let method: String
     let path: String
     let headers: [String: String]
     let headerLength: Int
     let contentLength: Int
     let expectsContinue: Bool
+    let usesChunkedTransferEncoding: Bool
 
     static func parse(from data: Data) -> HTTPParsedHeader? {
         let marker = Data("\r\n\r\n".utf8)
@@ -971,6 +1102,8 @@ private struct HTTPParsedHeader {
 
         let contentLength = headers["content-length"].flatMap(Int.init) ?? 0
         let expectsContinue = headers["expect"]?.localizedCaseInsensitiveContains("100-continue") == true
+        let usesChunkedTransferEncoding = headers["transfer-encoding"]?
+            .localizedCaseInsensitiveContains("chunked") == true
 
         return HTTPParsedHeader(
             method: String(requestParts[0]),
@@ -978,7 +1111,8 @@ private struct HTTPParsedHeader {
             headers: headers,
             headerLength: range.upperBound,
             contentLength: contentLength,
-            expectsContinue: expectsContinue
+            expectsContinue: expectsContinue,
+            usesChunkedTransferEncoding: usesChunkedTransferEncoding
         )
     }
 }

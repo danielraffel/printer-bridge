@@ -12,6 +12,11 @@ VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_
 TAG="v$VERSION"
 TITLE="Printer Bridge $VERSION"
 NOTES_FILE="$(mktemp)"
+if command -v ghapp >/dev/null 2>&1; then
+  GH_CLI="ghapp"
+else
+  GH_CLI="gh"
+fi
 UPLOAD_ARGS="
 $PKG_PATH#Printer-Bridge.pkg
 $SHA_PATH#Printer-Bridge.pkg.sha256
@@ -27,6 +32,8 @@ fi
 cat >"$NOTES_FILE" <<EOF
 Printer Bridge $VERSION
 
+- Fixes an IPP proxy stall that could leave iPhone print jobs cycling between Waiting and Printing
+- Prevents slow CUPS capability checks from blocking unrelated print requests
 - Signed macOS installer package for Printer Bridge
 - Signed disk image with installer and uninstall command
 - License agreement and install notes included in the installer
@@ -38,15 +45,15 @@ Download assets:
 - Printer-Bridge.pkg
 EOF
 
-if gh release view "$TAG" >/dev/null 2>&1; then
+if "$GH_CLI" release view "$TAG" >/dev/null 2>&1; then
   # shellcheck disable=SC2086
-  gh release upload "$TAG" \
+  "$GH_CLI" release upload "$TAG" \
     $UPLOAD_ARGS \
     --clobber
-  gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE"
+  "$GH_CLI" release edit "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE"
 else
   # shellcheck disable=SC2086
-  gh release create "$TAG" \
+  "$GH_CLI" release create "$TAG" \
     $UPLOAD_ARGS \
     --title "$TITLE" \
     --notes-file "$NOTES_FILE"

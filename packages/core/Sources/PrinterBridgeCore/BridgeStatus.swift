@@ -28,6 +28,8 @@ public struct AirPrintAdvertisementPlan: Equatable, Sendable {
     public let exposureMode: BridgeExposureMode
     public let txtRecords: [TXTRecord]
     public let warnings: [String]
+    public let prefetchedAttributes: IPPPrinterAttributesSnapshot?
+    public let prefetchedInspection: PrinterQueueInspection?
 
     public init(
         serviceName: String,
@@ -38,7 +40,9 @@ public struct AirPrintAdvertisementPlan: Equatable, Sendable {
         backingQueueName: String,
         exposureMode: BridgeExposureMode,
         txtRecords: [TXTRecord],
-        warnings: [String]
+        warnings: [String],
+        prefetchedAttributes: IPPPrinterAttributesSnapshot? = nil,
+        prefetchedInspection: PrinterQueueInspection? = nil
     ) {
         self.serviceName = serviceName
         self.hostName = hostName
@@ -49,6 +53,20 @@ public struct AirPrintAdvertisementPlan: Equatable, Sendable {
         self.exposureMode = exposureMode
         self.txtRecords = txtRecords
         self.warnings = warnings
+        self.prefetchedAttributes = prefetchedAttributes
+        self.prefetchedInspection = prefetchedInspection
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.serviceName == rhs.serviceName
+            && lhs.hostName == rhs.hostName
+            && lhs.port == rhs.port
+            && lhs.resourcePath == rhs.resourcePath
+            && lhs.printerURI == rhs.printerURI
+            && lhs.backingQueueName == rhs.backingQueueName
+            && lhs.exposureMode == rhs.exposureMode
+            && lhs.txtRecords == rhs.txtRecords
+            && lhs.warnings == rhs.warnings
     }
 }
 
@@ -374,7 +392,9 @@ public struct BridgeStatusService {
             backingQueueName: inspection.summary.name,
             exposureMode: exposureMode,
             txtRecords: txtRecords,
-            warnings: warnings
+            warnings: warnings,
+            prefetchedAttributes: attributes,
+            prefetchedInspection: inspection
         )
     }
 

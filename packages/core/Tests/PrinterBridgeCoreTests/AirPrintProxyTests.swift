@@ -25,6 +25,44 @@ func ippRequestParserSeparatesDocumentDataFromAttributes() throws {
     #expect(String(data: request.documentData, encoding: .utf8) == "PDF-DATA")
 }
 
+@Test
+func httpRequestAssemblerDecodesChunkedIPPBodyAlreadyBufferedWithHeaders() {
+    let assembler = HTTPRequestAssembler()
+    assembler.append(Data(
+        "POST /printers/test HTTP/1.1\r\n"
+            .appending("Content-Type: application/ipp\r\n")
+            .appending("Transfer-Encoding: chunked\r\n")
+            .appending("Expect: 100-continue\r\n\r\n")
+            .appending("4\r\nIPP-\r\n4\r\nDATA\r\n0\r\n\r\n")
+            .utf8
+    ))
+
+    #expect(assembler.shouldSendContinue)
+    assembler.markContinueSent()
+    let request = assembler.takeRequest()
+
+    #expect(request?.method == "POST")
+    #expect(request?.path == "/printers/test")
+    #expect(String(data: request?.body ?? Data(), encoding: .utf8) == "IPP-DATA")
+}
+
+@Test
+func httpRequestAssemblerWaitsForFinalChunkAcrossReads() {
+    let assembler = HTTPRequestAssembler()
+    assembler.append(Data(
+        "POST /printers/test HTTP/1.1\r\n"
+            .appending("Content-Type: application/ipp\r\n")
+            .appending("Transfer-Encoding: chunked\r\n\r\n")
+            .appending("8\r\nIPP-")
+            .utf8
+    ))
+
+    #expect(assembler.takeRequest() == nil)
+    assembler.append(Data("DATA\r\n0\r\n\r\n".utf8))
+
+    #expect(String(data: assembler.takeRequest()?.body ?? Data(), encoding: .utf8) == "IPP-DATA")
+}
+
 private func appendAttribute(tag: UInt8, name: String, value: String, to data: inout Data) {
     let nameData = Data(name.utf8)
     let valueData = Data(value.utf8)
