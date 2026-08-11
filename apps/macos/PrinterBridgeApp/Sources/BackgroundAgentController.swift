@@ -127,6 +127,9 @@ struct BackgroundAgentController {
         if output.contains("state = running") {
             return .running
         }
+        if output.contains("job state = spawn failed") {
+            return .stopped
+        }
         if output.contains("state = waiting") || output.contains("\"PID\" =") {
             return .loaded
         }
